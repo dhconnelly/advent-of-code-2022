@@ -1,0 +1,11 @@
+# advent-of-code-2022
+
+dependencies:
+
+- g++ with c++20 support
+- make
+
+usage:
+
+    make day$NUM
+    ./target/day$NUM <path_to_input_file>
