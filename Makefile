@@ -1,4 +1,4 @@
-CXX=clang++ -std=c++20 -stdlib=libc++ -Wall -Werror
+CXX=g++ -std=c++20 -Wall -Werror
 
 all: target/day1
 
