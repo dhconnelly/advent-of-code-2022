@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <istream>
 #include <ranges>
+#include <sstream>
 #include <string_view>
 #include <vector>
 
@@ -25,6 +26,42 @@ auto parse_lines(std::istream& is, F parse_line) {
 std::vector<std::string> parse_lines(std::ifstream& is) {
     std::function parse = [](const std::string& s) { return s; };
     return parse_lines(is, parse);
+}
+
+template <typename F>
+auto parse_entries(std::istream& is, F parse,
+                   const std::string_view sep = "\n\n",
+                   bool trim_trailing_newline = true) {
+    if (!is.good()) die(strerror(errno));
+    std::vector<decltype(parse(std::string()))> entries;
+
+    // parse entries separated by `sep`
+    std::string buf;
+    int sepi = 0;
+    for (int ch = is.get(); is.good(); ch = is.get()) {
+        if (ch == sep[sepi]) {
+            sepi++;
+        } else if (sepi > 0) {
+            buf.append(sep.substr(0, sepi));
+            buf.push_back(ch);
+            sepi = 0;
+        } else {
+            buf.push_back(ch);
+        }
+        if (sepi == sep.size()) {
+            sepi = 0;
+            entries.push_back(parse(buf));
+            buf.clear();
+        }
+    }
+
+    // collect trailing entry
+    if (sepi > 0 && (sepi > 1 || sep[0] != '\n' || !trim_trailing_newline))
+        buf.append(sep.substr(0, sepi));
+    if (!buf.empty()) entries.push_back(parse(buf));
+
+    if (is.bad()) die(strerror(errno));
+    return entries;
 }
 
 #endif  // SRC_UTIL_H_
