@@ -22,4 +22,9 @@ auto parse_lines(std::istream& is, F parse_line) {
     return lines;
 }
 
+std::vector<std::string> parse_lines(std::ifstream& is) {
+    std::function parse = [](const std::string& s) { return s; };
+    return parse_lines(is, parse);
+}
+
 #endif  // SRC_UTIL_H_
