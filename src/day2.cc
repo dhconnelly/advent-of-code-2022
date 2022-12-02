@@ -32,13 +32,24 @@ int score_hand(char hand) {
     die("invalid hand");
 }
 
-char play_to_hand(char play) {
-    switch (play) {
+char select_hand1(const Round& round) {
+    switch (round.second) {
         case 'X': return 'A';
         case 'Y': return 'B';
         case 'Z': return 'C';
     }
     die("invalid play");
+}
+
+char select_hand2(const Round& round) {
+    char outcome = round.second;
+    if (outcome == 'Y') return round.first;
+    switch (round.first) {
+        case 'A': return outcome == 'X' ? 'C' : 'B';
+        case 'B': return outcome == 'X' ? 'A' : 'C';
+        case 'C': return outcome == 'X' ? 'B' : 'A';
+    }
+    die("invalid outcome");
 }
 
 int outcome(char enemy_hand, char hand) {
@@ -51,18 +62,23 @@ int outcome(char enemy_hand, char hand) {
     die("invalid hands");
 }
 
-int score_round(const Round& round) {
-    int hand1 = round.first;
-    int hand2 = play_to_hand(round.second);
-    return score_hand(hand2) + outcome(hand1, hand2);
+int score_game(const std::vector<Round>& rounds,
+               std::function<char(const Round&)> select_hand) {
+    auto score_round = [&](const Round& round) {
+        int hand1 = round.first;
+        int hand2 = select_hand(round);
+        return score_hand(hand2) + outcome(hand1, hand2);
+    };
+    auto acc = [&](int sum, const Round& round) {
+        return sum + score_round(round);
+    };
+    return std::accumulate(rounds.begin(), rounds.end(), 0, acc);
 }
 
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day2 <input>");
     std::ifstream ifs(argv[1]);
     auto rounds = parse_rounds(ifs);
-    std::vector<int> scores;
-    std::transform(rounds.begin(), rounds.end(), std::back_inserter(scores),
-                   score_round);
-    std::cout << std::accumulate(scores.begin(), scores.end(), 0) << std::endl;
+    std::cout << score_game(rounds, select_hand1) << std::endl;
+    std::cout << score_game(rounds, select_hand2) << std::endl;
 }

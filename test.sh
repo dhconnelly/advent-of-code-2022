@@ -1,9 +1,8 @@
 #!/bin/bash
 set -e
 
-DAYS=day1
-
 make all
+echo "running tests..."
 
 test() {
     local day=$1
@@ -14,6 +13,10 @@ test() {
     fi
 }
 
-for day in "$DAYS"; do
+for input in inputs/*; do
+    file=$(basename -- "$input")
+    day="${file%.*}"
     test "$day"
 done
+
+echo "done"
