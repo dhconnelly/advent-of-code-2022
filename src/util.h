@@ -3,15 +3,16 @@
 
 #include <cinttypes>
 #include <cstdlib>
-#include <fstream>
-#include <iostream>
 #include <istream>
 #include <ranges>
 #include <sstream>
 #include <string_view>
 #include <vector>
 
-[[noreturn]] void die(const std::string_view msg);
+void die(const std::string_view msg) {
+    std::cerr << msg << std::endl;
+    std::exit(1);
+}
 
 template <typename F>
 auto parse_lines(std::istream& is, F parse_line) {
@@ -20,6 +21,11 @@ auto parse_lines(std::istream& is, F parse_line) {
     while (std::getline(is, line)) lines.push_back(parse_line(line));
     if (is.bad()) die(strerror(errno));
     return lines;
+}
+
+std::vector<std::string> parse_lines(std::ifstream& is) {
+    std::function parse = [](const std::string& s) { return s; };
+    return parse_lines(is, parse);
 }
 
 template <typename F>
