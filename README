@@ -9,3 +9,7 @@ usage:
 
     make ./target/day$NUM
     ./target/day$NUM <path_to_input_file>
+
+to run tests:
+
+    ./test.sh

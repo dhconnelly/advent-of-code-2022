@@ -6,7 +6,7 @@ target/day%: target/day%.o
 	mkdir -p target
 	$(CXX) $< -o $@
 
-target/%.o: src/%.cc src/util.h
+target/%.o: src/%.cc
 	mkdir -p target
 	$(CXX) -c $< -o $@
 
