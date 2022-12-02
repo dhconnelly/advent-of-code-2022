@@ -6,10 +6,7 @@
 #include <numeric>
 #include <vector>
 
-[[noreturn]] void die(const std::string_view msg) {
-    std::cerr << msg << std::endl;
-    std::exit(1);
-}
+#include "util.h"
 
 std::vector<int> parse_calories(std::istream& is) {
     if (!is.good()) die(strerror(errno));

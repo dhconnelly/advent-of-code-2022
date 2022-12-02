@@ -4,12 +4,14 @@ set -e
 make all
 echo "running tests..."
 
+failed=0
 test() {
     local day=$1
     local diff="$(diff <(./target/"$day" inputs/"$day".txt) outputs/"$day".txt)"
     if [ "$diff" != "" ]; then
         echo "FAIL: " "$day"
-        exit 1
+        failed=1
+    else echo "PASS: " "$day"
     fi
 }
 
@@ -19,4 +21,4 @@ for input in inputs/*; do
     test "$day"
 done
 
-echo "done"
+exit "$failed"

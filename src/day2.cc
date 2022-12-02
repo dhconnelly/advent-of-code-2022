@@ -7,10 +7,7 @@
 #include <string_view>
 #include <vector>
 
-[[noreturn]] void die(const std::string_view msg) {
-    std::cerr << msg << std::endl;
-    std::exit(1);
-}
+#include "util.h"
 
 using Round = std::pair<char, char>;
 
@@ -69,10 +66,9 @@ int score_game(const std::vector<Round>& rounds,
         int hand2 = select_hand(round);
         return score_hand(hand2) + outcome(hand1, hand2);
     };
-    auto acc = [&](int sum, const Round& round) {
-        return sum + score_round(round);
-    };
-    return std::accumulate(rounds.begin(), rounds.end(), 0, acc);
+    return std::accumulate(
+        rounds.begin(), rounds.end(), 0,
+        [&](int sum, const Round& round) { return sum + score_round(round); });
 }
 
 int main(int argc, char* argv[]) {
