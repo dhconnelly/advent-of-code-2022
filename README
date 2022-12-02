@@ -1,11 +1,33 @@
 # advent-of-code-2022
 
+## building
+
 dependencies:
 
 - g++ with c++20 support
 - make
 
-usage:
+then just run:
 
-    make ./target/day$NUM
-    ./target/day$NUM <path_to_input_file>
+    make
+
+## usage
+
+to run a day's solution on an input:
+
+    ./target/aoc2022 <day> <file>
+
+to run the test suite:
+
+    ./target/aoc2022test [day ...]
+
+## development
+
+1.  add a new file in `src/solutions`, e.g. `src/solutions/day26.cc`
+2.  implement functions to parse, solve part 1, and solve part 2, and run tests
+3.  call `REGISTER_SOLUTION(day26, parse, solve1, solve2, test)` in your file
+4.  run your tests with `./target/aoc2022test day26`
+5.  run your solution on an input with `./target/aoc2022 day26 <file>`
+
+see `src/aoc.h` for more details on solution registration and existing
+solutions in `src/solutions` for examples.
