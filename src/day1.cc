@@ -6,7 +6,7 @@
 #include <numeric>
 #include <vector>
 
-void die(const std::string_view msg) {
+[[noreturn]] void die(const std::string_view msg) {
     std::cerr << msg << std::endl;
     std::exit(1);
 }

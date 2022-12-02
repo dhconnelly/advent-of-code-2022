@@ -1,6 +1,6 @@
 CXX=g++ -std=c++20 -Wall -Werror
 
-all: target/day1
+all: target/day1 target/day2
 
 target/day%: target/day%.o
 	mkdir -p target
