@@ -1,4 +1,4 @@
-CXX=g++ -std=c++20 -Wall -Werror -Ofast
+CXX=g++ -std=c++20 -Wall -Werror
 DAYS=target/solutions/day1.o target/solutions/day0.o
 
 all: target/aoc2022 target/aoc2022test

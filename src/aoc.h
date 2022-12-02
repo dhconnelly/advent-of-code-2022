@@ -2,13 +2,13 @@
 #define SRC_AOC_H_
 
 #include <istream>
-#include <unordered_map>
+#include <map>
 
 using TestFn = std::function<void()>;
 using SolutionFn = std::function<void(std::istream&)>;
 
-extern std::unordered_map<std::string, TestFn> kTests;
-extern std::unordered_map<std::string, SolutionFn> kSolutions;
+extern std::map<std::string, TestFn> kTests;
+extern std::map<std::string, SolutionFn> kSolutions;
 
 class SolutionRegistration {
 public:

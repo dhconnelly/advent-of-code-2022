@@ -1,4 +1,4 @@
 #include "aoc.h"
 
-std::unordered_map<std::string, TestFn> kTests;
-std::unordered_map<std::string, SolutionFn> kSolutions;
+std::map<std::string, TestFn> kTests;
+std::map<std::string, SolutionFn> kSolutions;
