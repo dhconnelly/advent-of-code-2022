@@ -37,36 +37,47 @@ compartment intersect(const compartment& left, const compartment& right) {
     return c;
 }
 
-void merge_into(compartment& into, const compartment& from) {
-    for (char ch : from) into.insert(ch);
+compartment merge(const compartment& left, const compartment& right) {
+    compartment c(left);
+    for (char ch : right) c.insert(ch);
+    return c;
 }
+
+class group {
+public:
+    void update(const compartment& contents) {
+        if (common_.empty()) common_ = contents;
+        else common_ = intersect(common_, contents);
+        ++size_;
+    }
+
+    bool done() const { return size_ == 3; }
+    char badge() const { return *common_.begin(); }
+
+private:
+    int size_ = 0;
+    compartment common_;
+};
 
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day3 <file>");
     std::ifstream ifs(argv[1]);
     if (!ifs.good()) die(strerror(errno));
-    std::string line;
-    int sum = 0;
-    int group_count = 0;
-    compartment group_common;
+    int duplicates_sum = 0;
     int badges_sum = 0;
+    group group;
+    std::string line;
     while (std::getline(ifs, line)) {
         auto rucksack = parse_rucksack(line);
         auto common = intersect(rucksack.first, rucksack.second);
-        sum += priority(*common.begin());
-
-        merge_into(rucksack.first, rucksack.second);
-        if (group_count == 0) group_common = rucksack.first;
-        else group_common = intersect(rucksack.first, group_common);
-        ++group_count;
-
-        if (group_count == 3) {
-            badges_sum += priority(*group_common.begin());
-            group_common.clear();
-            group_count = 0;
+        duplicates_sum += priority(*common.begin());
+        group.update(merge(rucksack.first, rucksack.second));
+        if (group.done()) {
+            badges_sum += priority(group.badge());
+            group = {};
         }
     }
     if (!ifs.eof()) die(strerror(errno));
-    std::cout << sum << std::endl;
+    std::cout << duplicates_sum << std::endl;
     std::cout << badges_sum << std::endl;
 }
