@@ -29,11 +29,16 @@ rucksack parse_rucksack(const std::string_view s) {
     return {parse_compartment(left), parse_compartment(right)};
 }
 
-char intersect(const compartment& left, const compartment& right) {
+compartment intersect(const compartment& left, const compartment& right) {
+    compartment c;
     for (char item : right) {
-        if (left.count(item)) return item;
+        if (left.count(item)) c.insert(item);
     }
-    die("no intersection");
+    return c;
+}
+
+void merge_into(compartment& into, const compartment& from) {
+    for (char ch : from) into.insert(ch);
 }
 
 int main(int argc, char* argv[]) {
@@ -42,11 +47,26 @@ int main(int argc, char* argv[]) {
     if (!ifs.good()) die(strerror(errno));
     std::string line;
     int sum = 0;
+    int group_count = 0;
+    compartment group_common;
+    int badges_sum = 0;
     while (std::getline(ifs, line)) {
         auto rucksack = parse_rucksack(line);
-        auto item = intersect(rucksack.first, rucksack.second);
-        sum += priority(item);
+        auto common = intersect(rucksack.first, rucksack.second);
+        sum += priority(*common.begin());
+
+        merge_into(rucksack.first, rucksack.second);
+        if (group_count == 0) group_common = rucksack.first;
+        else group_common = intersect(rucksack.first, group_common);
+        ++group_count;
+
+        if (group_count == 3) {
+            badges_sum += priority(*group_common.begin());
+            group_common.clear();
+            group_count = 0;
+        }
     }
     if (!ifs.eof()) die(strerror(errno));
     std::cout << sum << std::endl;
+    std::cout << badges_sum << std::endl;
 }
