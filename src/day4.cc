@@ -43,16 +43,14 @@ std::optional<range> intersection(const range& r1, const range& r2) {
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day4 <file>");
     std::ifstream ifs(argv[1]);
-    auto begin = std::istream_iterator<range_pair>(ifs);
-    auto end = std::istream_iterator<range_pair>();
-    auto [count1, count2] = std::accumulate(
-        begin, end, std::pair<int, int>(), [](auto counts, auto pair) {
-            auto r = intersection(pair.first, pair.second);
-            if (!r) return counts;
-            if (pair.first == *r || pair.second == *r) counts.first++;
-            counts.second++;
-            return counts;
-        });
-    std::cout << count1 << std::endl;
-    std::cout << count2 << std::endl;
+    int count_contained = 0, count_overlap = 0;
+    for (auto it = std::istream_iterator<range_pair>(ifs);
+         it != std::istream_iterator<range_pair>(); ++it) {
+        auto r = intersection(it->first, it->second);
+        if (!r) continue;
+        if (it->first == *r || it->second == *r) count_contained++;
+        count_overlap++;
+    }
+    std::cout << count_contained << std::endl;
+    std::cout << count_overlap << std::endl;
 }
