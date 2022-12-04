@@ -4,6 +4,7 @@
 #include <numeric>
 #include <optional>
 #include <utility>
+#include <vector>
 
 #include "util.h"
 
@@ -39,21 +40,17 @@ std::optional<range> intersection(const range& r1, const range& r2) {
     return result;
 }
 
-std::ostream& operator<<(std::ostream& os, const range& r) {
-    return os << '[' << r.first << '-' << r.second << ']';
-}
-
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day4 <file>");
     std::ifstream ifs(argv[1]);
-    std::cout << std::accumulate(
-                     std::istream_iterator<range_pair>(ifs),
-                     std::istream_iterator<range_pair>(), 0,
-                     [](int count, const auto& pair) {
-                         auto r = intersection(pair.first, pair.second);
-                         if (r && (*r == pair.first || *r == pair.second))
-                             count++;
-                         return count;
-                     })
-              << std::endl;
+    int count_contained = 0, count_overlap = 0;
+    for (auto it = std::istream_iterator<range_pair>(ifs);
+         it != std::istream_iterator<range_pair>(); ++it) {
+        auto r = intersection(it->first, it->second);
+        if (!r) continue;
+        if (it->first == *r || it->second == *r) count_contained++;
+        count_overlap++;
+    }
+    std::cout << count_contained << std::endl;
+    std::cout << count_overlap << std::endl;
 }
