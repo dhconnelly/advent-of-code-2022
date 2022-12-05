@@ -1,8 +1,6 @@
 #include <fstream>
 #include <iostream>
-#include <regex>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "util.h"
@@ -14,12 +12,6 @@ std::vector<std::string> read_stacks_section(std::istream& is) {
     }
     return lines;
 }
-
-struct instr {
-    int amt;
-    int src;
-    int dst;
-};
 
 using stack = std::vector<char>;
 
@@ -40,6 +32,12 @@ std::vector<stack> parse_stacks(const std::vector<std::string>& lines) {
     return stacks;
 }
 
+struct instr {
+    int amt;
+    int src;
+    int dst;
+};
+
 std::istream& operator>>(std::istream& is, instr& i) {
     std::string buf;  // throw away
     is >> buf;
@@ -51,34 +49,36 @@ std::istream& operator>>(std::istream& is, instr& i) {
     return is;
 }
 
-void apply(std::vector<stack>& stacks, const instr& instr) {
+void apply1(std::vector<stack>& stacks, const instr& instr) {
     for (int i = 0; i < instr.amt; i++) {
         stacks[instr.dst - 1].push_back(stacks[instr.src - 1].back());
         stacks[instr.src - 1].pop_back();
     }
 }
 
-void print_stacks(const std::vector<stack>& stacks) {
-    for (int stack = 0; stack < stacks.size(); stack++) {
-        std::cout << "stack: " << stack << "(" << stacks[stack].size() << ")";
-        for (auto box : stacks[stack]) std::cout << ' ' << box;
-        std::cout << std::endl;
+void apply2(std::vector<stack>& stacks, const instr& instr) {
+    auto& src = stacks[instr.src - 1];
+    for (int i = instr.amt; i > 0; i--) {
+        stacks[instr.dst - 1].push_back(src[src.size() - i]);
     }
+    src.resize(src.size() - instr.amt);
 }
 
-std::string tops(const std::vector<stack>& stacks) {
-    std::string tops;
-    for (const auto& stack : stacks) tops.push_back(stack.back());
-    return tops;
+void print_tops(const std::vector<stack>& stacks) {
+    for (const auto& stack : stacks) std::cout << stack.back();
+    std::cout << std::endl;
 }
 
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day5 <file>");
     std::ifstream ifs(argv[1]);
-    auto stacks = parse_stacks(read_stacks_section(ifs));
+    auto stacks1 = parse_stacks(read_stacks_section(ifs));
+    auto stacks2 = stacks1;
     for (auto it = std::istream_iterator<instr>(ifs);
          it != std::istream_iterator<instr>(); ++it) {
-        apply(stacks, *it);
+        apply1(stacks1, *it);
+        apply2(stacks2, *it);
     }
-    std::cout << tops(stacks) << std::endl;
+    print_tops(stacks1);
+    print_tops(stacks2);
 }
