@@ -26,6 +26,7 @@ using stack = std::vector<char>;
 stack parse_stack(const std::vector<std::string>& lines, int col) {
     stack s;
     for (int row = lines.size() - 2; row >= 0; row--) {
+        if (lines[row][col + 1] == ' ') break;
         s.push_back(lines[row][col + 1]);
     }
     return s;
@@ -50,18 +51,34 @@ std::istream& operator>>(std::istream& is, instr& i) {
     return is;
 }
 
+void apply(std::vector<stack>& stacks, const instr& instr) {
+    for (int i = 0; i < instr.amt; i++) {
+        stacks[instr.dst - 1].push_back(stacks[instr.src - 1].back());
+        stacks[instr.src - 1].pop_back();
+    }
+}
+
+void print_stacks(const std::vector<stack>& stacks) {
+    for (int stack = 0; stack < stacks.size(); stack++) {
+        std::cout << "stack: " << stack << "(" << stacks[stack].size() << ")";
+        for (auto box : stacks[stack]) std::cout << ' ' << box;
+        std::cout << std::endl;
+    }
+}
+
+std::string tops(const std::vector<stack>& stacks) {
+    std::string tops;
+    for (const auto& stack : stacks) tops.push_back(stack.back());
+    return tops;
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day5 <file>");
     std::ifstream ifs(argv[1]);
     auto stacks = parse_stacks(read_stacks_section(ifs));
     for (auto it = std::istream_iterator<instr>(ifs);
          it != std::istream_iterator<instr>(); ++it) {
-        std::cout << "moving: " << it->amt << " -> " << it->src << " to "
-                  << it->dst << std::endl;
+        apply(stacks, *it);
     }
-    for (int stack = 0; stack < stacks.size(); stack++) {
-        std::cout << "stack: " << stack;
-        for (auto box : stacks[stack]) std::cout << ' ' << box;
-        std::cout << std::endl;
-    }
+    std::cout << tops(stacks) << std::endl;
 }
