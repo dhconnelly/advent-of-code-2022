@@ -41,12 +41,7 @@ struct instr {
 
 std::istream& operator>>(std::istream& is, instr& i) {
     std::string buf;  // throw away
-    is >> buf;
-    is >> i.amt;
-    is >> buf;
-    is >> i.src;
-    is >> buf;
-    is >> i.dst;
+    is >> buf >> i.amt >> buf >> i.src >> buf >> i.dst;
     return is;
 }
 
