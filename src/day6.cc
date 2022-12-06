@@ -3,6 +3,7 @@
 #include <iterator>
 #include <list>
 #include <map>
+#include <vector>
 
 #include "util.h"
 
@@ -22,35 +23,27 @@ public:
         }
     }
 
-    friend std::ostream& operator<<(std::ostream& os,
-                                    const windowed_set& window) {
-        std::cout << "window";
-        os << '[';
-        for (const auto& t : window.window_) std::cout << ' ' << t;
-        os << " ]";
-        std::cout << "set";
-        os << '[';
-        for (const auto& t : window.ts_)
-            std::cout << ' ' << t.first << '(' << t.second << ')';
-        os << " ]";
-        return os;
-    }
-
 private:
     std::map<T, int> ts_;
     std::list<T> window_;
     const int max_;
 };
 
-int main(int argc, char* argv[]) {
-    if (argc != 2) die("usage: day6 <file>");
-    std::ifstream ifs(argv[1]);
-    windowed_set<char> window(4);
+int find_marker(const std::vector<char>& chars, int max) {
+    windowed_set<char> window(max);
     int i = 0;
-    for (auto it = std::istream_iterator<char>(ifs);
-         it != std::istream_iterator<char>() && window.distinct() < 4;
+    for (auto it = chars.begin(); it != chars.end() && window.distinct() < max;
          it++, i++) {
         window.push(*it);
     }
-    std::cout << i << std::endl;
+    return i;
+}
+
+int main(int argc, char* argv[]) {
+    if (argc != 2) die("usage: day6 <file>");
+    std::ifstream ifs(argv[1]);
+    std::vector<char> chars((std::istream_iterator<char>(ifs)),
+                            std::istream_iterator<char>());
+    std::cout << find_marker(chars, 4) << std::endl;
+    std::cout << find_marker(chars, 14) << std::endl;
 }
