@@ -26,7 +26,7 @@ stack parse_stack(const std::vector<std::string>& lines, int col) {
 
 std::vector<stack> parse_stacks(const std::vector<std::string>& lines) {
     std::vector<stack> stacks;
-    for (int col = 0; col < lines[0].size(); col += 4) {
+    for (size_t col = 0; col < lines[0].size(); col += 4) {
         stacks.push_back(parse_stack(lines, col));
     }
     return stacks;
