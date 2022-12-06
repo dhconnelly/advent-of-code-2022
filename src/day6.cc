@@ -10,9 +10,9 @@
 template <typename T>
 class windowed_set {
 public:
-    windowed_set(int max) : max_(max) {}
-    int size() const { return window_.size(); }
-    int distinct() const { return ts_.size(); }
+    windowed_set(size_t max) : max_(max) {}
+    size_t size() const { return window_.size(); }
+    size_t distinct() const { return ts_.size(); }
     void push(T t) {
         window_.push_back(t);
         ts_[t]++;
@@ -26,12 +26,12 @@ public:
 private:
     std::map<T, int> ts_;
     std::list<T> window_;
-    const int max_;
+    const size_t max_;
 };
 
-int find_marker(const std::vector<char>& chars, int max) {
+size_t find_marker(const std::vector<char>& chars, size_t max) {
     windowed_set<char> window(max);
-    int i = 0;
+    size_t i = 0;
     for (auto it = chars.begin(); it != chars.end() && window.distinct() < max;
          it++, i++) {
         window.push(*it);
