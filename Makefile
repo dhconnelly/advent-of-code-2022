@@ -1,4 +1,4 @@
-CXX=g++ -std=c++20 -Wall -Werror
+CXX=g++ -std=c++20 -Wall -Werror -Ofast
 
 all: target/day1 target/day2 target/day3 target/day4 target/day5 \
 	target/day6

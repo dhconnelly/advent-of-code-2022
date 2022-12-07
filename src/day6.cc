@@ -29,12 +29,10 @@ private:
     const size_t max_;
 };
 
-size_t find_marker(const std::vector<char>& chars, size_t max) {
-    windowed_set<char> window(max);
+size_t find_marker(const std::vector<char>& chars, size_t n) {
     size_t i = 0;
-    for (auto it = chars.begin(); it != chars.end() && window.distinct() < max;
-         it++, i++) {
-        window.push(*it);
+    for (windowed_set<char> w(n); i < chars.size() && w.distinct() < n; i++) {
+        w.push(chars[i]);
     }
     return i;
 }
