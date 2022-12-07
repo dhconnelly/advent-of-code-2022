@@ -13,7 +13,7 @@
 struct dir_entry {
     std::map<std::string, int64_t> files;
     std::map<std::string, std::unique_ptr<dir_entry>> dirs;
-    int64_t total_size;
+    int64_t size;
 };
 
 std::unique_ptr<dir_entry> parse_dir(std::istream& is) {
@@ -46,36 +46,32 @@ std::unique_ptr<dir_entry> parse_dir(std::istream& is) {
 }
 
 std::unique_ptr<dir_entry> parse_filesystem(std::istream& is) {
-    std::string root;
-    if (!std::getline(is, root) || root != "$ cd /") die("bad filesystem");
+    if (std::string root; !std::getline(is, root) || root != "$ cd /")
+        die("bad filesystem");
     return parse_dir(is);
 }
 
-std::pair<int64_t, int64_t> sum_total_sizes(dir_entry& dir, int64_t max) {
+int64_t find_sum_smaller(dir_entry& dir, int64_t max) {
     int64_t files_size = std::accumulate(
         dir.files.begin(), dir.files.end(), 0,
         [](int64_t sum, const auto& file) { return sum + file.second; });
-    int64_t sizes_smaller = 0;
-    int64_t dirs_size = std::accumulate(
-        dir.dirs.begin(), dir.dirs.end(), 0, [&](int64_t sum, const auto& dir) {
-            auto [subdir, subdir_smaller] = sum_total_sizes(*dir.second, max);
-            sizes_smaller += subdir_smaller;
-            return sum + subdir;
+    auto [dirs_size, sizes_smaller] = std::accumulate(
+        dir.dirs.begin(), dir.dirs.end(), std::pair{0, 0},
+        [&](auto sums, const auto& dir) {
+            auto subdir_smaller = find_sum_smaller(*dir.second, max);
+            return std::pair{sums.first + dir.second->size,
+                             sums.second + subdir_smaller};
         });
-    int64_t total_size = files_size + dirs_size;
-    dir.total_size = total_size;
-    if (total_size <= max) sizes_smaller += total_size;
-    return {total_size, sizes_smaller};
+    dir.size = files_size + dirs_size;
+    if (dir.size <= max) sizes_smaller += dir.size;
+    return sizes_smaller;
 }
 
-int64_t find_deletion(const dir_entry& dir, int64_t free, int64_t needed) {
-    int64_t deletion = std::numeric_limits<int64_t>::max();
-    if ((free + dir.total_size) >= needed) {
-        deletion = std::min(deletion, dir.total_size);
-    }
+int64_t min_del(const dir_entry& dir, int64_t free, int64_t needed) {
+    static const int64_t kMaxInt = std::numeric_limits<int64_t>::max();
+    int64_t deletion = ((free + dir.size) >= needed) ? dir.size : kMaxInt;
     for (const auto& [_, subdir] : dir.dirs) {
-        auto subdir_deletion = find_deletion(*subdir, free, needed);
-        deletion = std::min(deletion, subdir_deletion);
+        deletion = std::min(deletion, min_del(*subdir, free, needed));
     }
     return deletion;
 }
@@ -84,7 +80,6 @@ int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day7 <file>");
     std::ifstream ifs(argv[1]);
     auto root = parse_filesystem(ifs);
-    auto [total, smaller] = sum_total_sizes(*root, 100000);
-    std::cout << smaller << std::endl;
-    std::cout << find_deletion(*root, 70000000 - total, 30000000) << std::endl;
+    std::cout << find_sum_smaller(*root, 100000) << std::endl;
+    std::cout << min_del(*root, 70000000 - root->size, 30000000) << std::endl;
 }
