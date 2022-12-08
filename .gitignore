@@ -1,3 +1,4 @@
 target/
 .vscode/
-real_inputs/
+inputs/*_real.txt
+outputs/*_real.txt
