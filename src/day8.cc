@@ -1,7 +1,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
-#include <numeric>
+#include <limits>
 #include <set>
 #include <utility>
 #include <vector>
@@ -26,25 +26,47 @@ pt2 add(pt2 a, pt2 b) { return {a.first + b.first, a.second + b.second}; }
 int get(const grid& g, pt2 at) { return g[at.first][at.second]; }
 
 int count_visible(const grid& g) {
-    std::set<pt2> visible;
-    auto count_along = [&](pt2 start, pt2 end, pt2 step) {
-        int max;
+    auto visible_along = [&](pt2 start, pt2 end, pt2 step) {
+        int h = get(g, start);
         for (auto cur = start; cur != end; cur = add(cur, step)) {
-            if (int h = get(g, cur); cur == start || h > max) {
-                visible.insert(cur);
-                max = h;
-            }
+            if (cur != start && get(g, cur) >= h) return false;
         }
+        return true;
     };
+    int visible = 0;
     for (int row = 0; row < g.size(); row++) {
-        count_along({row, 0}, {row, g[0].size()}, {0, 1});
-        count_along({row, g[0].size() - 1}, {row, -1}, {0, -1});
+        for (int col = 0; col < g[row].size(); col++) {
+            std::pair cur{row, col};
+            if (visible_along(cur, {-1, col}, {-1, 0})) visible++;
+            else if (visible_along(cur, {g.size(), col}, {1, 0})) visible++;
+            else if (visible_along(cur, {row, -1}, {0, -1})) visible++;
+            else if (visible_along(cur, {row, g[0].size()}, {0, 1})) visible++;
+        }
     }
-    for (int col = 0; col < g[0].size(); col++) {
-        count_along({0, col}, {g.size(), col}, {1, 0});
-        count_along({g.size() - 1, col}, {-1, col}, {-1, 0});
+    return visible;
+}
+
+int max_score(const grid& g) {
+    auto visible_along = [&](pt2 start, pt2 end, pt2 step) {
+        int h = get(g, start), n = 0;
+        for (auto cur = add(start, step); cur != end; cur = add(cur, step)) {
+            n++;
+            if (get(g, cur) >= h) break;
+        }
+        return n;
+    };
+    int max_score = std::numeric_limits<int>::min();
+    for (int row = 0; row < g.size(); row++) {
+        for (int col = 0; col < g[row].size(); col++) {
+            std::pair cur{row, col};
+            int score = visible_along(cur, {-1, col}, {-1, 0}) *
+                        visible_along(cur, {g.size(), col}, {1, 0}) *
+                        visible_along(cur, {row, -1}, {0, -1}) *
+                        visible_along(cur, {row, g[0].size()}, {0, 1});
+            if (score > max_score) max_score = score;
+        }
     }
-    return visible.size();
+    return max_score;
 }
 
 int main(int argc, char* argv[]) {
@@ -52,4 +74,5 @@ int main(int argc, char* argv[]) {
     std::ifstream ifs(argv[1]);
     auto g = read_grid(ifs);
     std::cout << count_visible(g) << std::endl;
+    std::cout << max_score(g) << std::endl;
 }
