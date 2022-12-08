@@ -47,7 +47,7 @@ int count_visible(const grid& g) {
 }
 
 int max_score(const grid& g) {
-    auto visible_along = [&](pt2 start, pt2 end, pt2 step) {
+    auto count_visible = [&](pt2 start, pt2 end, pt2 step) {
         int h = get(g, start), n = 0;
         for (auto cur = add(start, step); cur != end; cur = add(cur, step)) {
             n++;
@@ -59,10 +59,10 @@ int max_score(const grid& g) {
     for (int row = 0; row < g.size(); row++) {
         for (int col = 0; col < g[row].size(); col++) {
             std::pair cur{row, col};
-            int score = visible_along(cur, {-1, col}, {-1, 0}) *
-                        visible_along(cur, {g.size(), col}, {1, 0}) *
-                        visible_along(cur, {row, -1}, {0, -1}) *
-                        visible_along(cur, {row, g[0].size()}, {0, 1});
+            int score = count_visible(cur, {-1, col}, {-1, 0}) *
+                        count_visible(cur, {g.size(), col}, {1, 0}) *
+                        count_visible(cur, {row, -1}, {0, -1}) *
+                        count_visible(cur, {row, g[0].size()}, {0, 1});
             if (score > max_score) max_score = score;
         }
     }
