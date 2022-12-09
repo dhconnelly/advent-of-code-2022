@@ -1,8 +1,10 @@
 #include <iostream>
+#include <iterator>
 #include <fstream>
 #include <numeric>
 #include <utility>
 #include <set>
+#include <vector>
 
 #include "util.h"
 
@@ -61,13 +63,21 @@ pt2 move_head(pt2 cur_head, char dir) {
   return cur_head;
 }
 
-std::set<pt2> move_rope(std::istream& is) {
+struct instr : std::pair<char, int> {
+  using std::pair<char, int>::pair;
+};
+
+std::istream& operator>>(std::istream& is, instr& i) {
+  if (!(is >> i.first)) return is;
+  if (!(is >> i.second)) return is;
+  return is;
+}
+
+std::set<pt2> move_rope(const std::vector<instr>& instrs) {
   pt2 head, tail;
-  char dir;
-  int dist;
   std::set<pt2> v;
   v.insert(tail);
-  while (is && is >> dir && is >> dist) {
+  for (const auto& [dir, dist] : instrs) {
     for (int i = 0; i < dist; i++) {
       head = move_head(head, dir);
       tail = move_tail(tail, head);
@@ -80,7 +90,10 @@ std::set<pt2> move_rope(std::istream& is) {
 int main(int argc, char* argv[]) {
   if (argc != 2) die("usage: day9 <file>");
   std::ifstream ifs(argv[1]);
-  auto v = move_rope(ifs);
+  std::vector<instr> instrs(
+      (std::istream_iterator<instr>(ifs)),
+      (std::istream_iterator<instr>()));
+  auto v = move_rope(instrs);
   std::cout << v.size() << std::endl;
 }
 
