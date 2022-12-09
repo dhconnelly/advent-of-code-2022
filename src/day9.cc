@@ -26,7 +26,7 @@ pt2 unit_vec(pt2 from, pt2 to) {
   pt2 vec{to.first - from.first, to.second - from.second};
   if (vec.first != 0) vec.first = vec.first / std::abs(vec.first);
   if (vec.second != 0) vec.second = vec.second / std::abs(vec.second);
-  if (vec.first != 0 && vec.second != 0) die("unreachable");
+  if (vec.first != 0 && vec.second != 0) die("unreachable: bad unit vec");
   return vec;
 }
 
@@ -34,9 +34,8 @@ pt2 add(pt2 a, pt2 b) {
   return {a.first + b.first, a.second + b.second};
 }
 
-
 pt2 move_tail(pt2 cur_tail, pt2 head) {
-  static constexpr pt2 kNbrDirs[] = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
+  static constexpr pt2 kDiagonals[] = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
   int d = step_dist(cur_tail, head);
   if (touching(cur_tail, head)) {
     return cur_tail;
@@ -45,11 +44,11 @@ pt2 move_tail(pt2 cur_tail, pt2 head) {
   } else {
     // assume the rest is right and step diagonally
     for (int i = 0; i < 4; i++) {
-      pt2 nbr = add(head, kNbrDirs[i]);
-      if (touching(nbr, cur_tail)) return nbr;
+      pt2 nbr = add(cur_tail, kDiagonals[i]);
+      if (touching(nbr, head)) return nbr;
     }
   }
-  die("unreachable");
+  die("unreachable: bad tail movement");
 }
 
 pt2 move_head(pt2 cur_head, char dir) {
@@ -58,7 +57,7 @@ pt2 move_head(pt2 cur_head, char dir) {
     case 'R': cur_head.second++; break;
     case 'D': cur_head.first--; break;
     case 'L': cur_head.second--; break;
-    default: die("bad direction");
+    default: die("unreachable: bad direction");
   }
   return cur_head;
 }
@@ -73,15 +72,17 @@ std::istream& operator>>(std::istream& is, instr& i) {
   return is;
 }
 
-std::set<pt2> move_rope(const std::vector<instr>& instrs) {
-  pt2 head, tail;
+std::set<pt2> move_rope(const std::vector<instr>& instrs, int len) {
+  std::vector<pt2> knots(len);
   std::set<pt2> v;
-  v.insert(tail);
+  v.insert(knots.back());
   for (const auto& [dir, dist] : instrs) {
     for (int i = 0; i < dist; i++) {
-      head = move_head(head, dir);
-      tail = move_tail(tail, head);
-      v.insert(tail);
+      knots[0] = move_head(knots[0], dir);
+      for (int j = 1; j < len; j++) {
+        knots[j] = move_tail(knots[j], knots[j-1]);
+      }
+      v.insert(knots.back());
     }
   }
   return v;
@@ -93,7 +94,7 @@ int main(int argc, char* argv[]) {
   std::vector<instr> instrs(
       (std::istream_iterator<instr>(ifs)),
       (std::istream_iterator<instr>()));
-  auto v = move_rope(instrs);
-  std::cout << v.size() << std::endl;
+  std::cout << move_rope(instrs, 2).size() << std::endl;
+  std::cout << move_rope(instrs, 10).size() << std::endl;
 }
 
