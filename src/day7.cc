@@ -1,4 +1,5 @@
 #include <cinttypes>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -6,6 +7,8 @@
 #include <map>
 #include <memory>
 #include <numeric>
+#include <regex>
+#include <string>
 #include <vector>
 
 #include "util.h"
@@ -16,32 +19,48 @@ struct dir_entry {
     int64_t size;
 };
 
+void eat_line(std::istream& is, const std::regex& pat, std::smatch& m,
+              std::string& buf) {
+    if (!std::getline(is, buf)) die(strerror(errno));
+    if (!std::regex_match(buf, m, pat)) die("failed match: " + buf);
+}
+
+std::string get_match(const std::smatch& m, size_t n) {
+    return std::string(m[n].first, m[n].second);
+}
+
 std::unique_ptr<dir_entry> parse_dir(std::istream& is) {
-    // TODO: figure out the std::regex api
     auto dir = std::make_unique<dir_entry>();
     std::string line;
-    if (!std::getline(is, line) || line != "$ ls") die("expected ls: " + line);
+    std::smatch m;
+
+    // always expect ls when entering a new directory
+    static const std::regex ls_pat(R"(\$ ls)");
+    eat_line(is, ls_pat, m, line);
+
+    // read ls output
     while (is.peek() != '$' && !is.eof()) {
-        if (!std::getline(is, line)) die("expected file");
-        if (line[0] == 'd') {
-            dir->dirs.insert({line.substr(4), std::make_unique<dir_entry>()});
+        if (!std::getline(is, line)) die("can't read file");
+        static const std::regex file_pat(R"((\d+) ((\.|\w)+))");
+        static const std::regex dir_pat(R"(dir (\w+))");
+        if (std::regex_match(line, m, dir_pat)) {
+            dir->dirs.insert({get_match(m, 1), std::make_unique<dir_entry>()});
+        } else if (std::regex_match(line, m, file_pat)) {
+            dir->files.insert({get_match(m, 2), std::stoll(get_match(m, 1))});
         } else {
-            int sep = line.find(' ');
-            int64_t size = std::stoll(line.substr(0, sep));
-            auto name = line.substr(sep + 1);
-            dir->files.insert({name, size});
+            die("bad file: " + line);
         }
     }
-    while (std::getline(is, line)) {
-        if (line.find("$ cd") != 0) die("expected cd: " + line);
-        if (line[5] == '.') {
-            if (line[6] != '.') die("bad cd");
-            break;
-        } else {
-            auto name = line.substr(5);
-            dir->dirs.at(name) = parse_dir(is);
-        }
+
+    // process directories recursively
+    while (!is.eof()) {
+        static const std::regex cd_pat(R"(\$ cd ((\w+)|(\.\.)))");
+        eat_line(is, cd_pat, m, line);
+        if (m[2].matched) dir->dirs.at(get_match(m, 2)) = parse_dir(is);
+        else if (m[3].matched) break;
+        else die("unreachable");
     }
+
     return dir;
 }
 
