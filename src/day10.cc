@@ -54,6 +54,8 @@ class vm {
 public:
     explicit vm(std::vector<instr> program) : program_(program) {}
     int64_t cycle() const { return cycle_; }
+    int64_t x() const { return x_; }
+    bool halted() const { return state_ == vm_state::halted; }
     int64_t signal() const { return cycle_ * x_; }
     bool start();
     void tick();
@@ -90,6 +92,11 @@ void vm::log() {
     std::cout << std::endl;
 }
 
+bool sprite_active(int64_t pixel, const vm& vm) {
+    int64_t x = vm.x();
+    return x - 1 == pixel || x == pixel || x + 1 == pixel;
+}
+
 bool vm::start() {
     if (program_.empty()) return false;
     pc_ = 0;
@@ -121,10 +128,16 @@ int64_t signal_sum(std::istream& is,
                                (std::istream_iterator<instr>()));
     vm vm(program);
     if (!vm.start()) die("bad program");
-    while (vm.cycle() <= *std::max_element(cycles.begin(), cycles.end())) {
+    for (int i = 0; !vm.halted(); i++) {
+        if ((i % 40) == 0) {
+            i = 0;
+            std::cout << std::endl;
+        }
+        std::cout << (sprite_active(i, vm) ? '#' : '.');
         if (cycles.count(vm.cycle())) sum += vm.signal();
         vm.tick();
     }
+    std::cout << std::endl;
     return sum;
 }
 
