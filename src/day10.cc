@@ -55,7 +55,7 @@ bool sprite_active(int pixel, const vm<T>& vm) {
     return x - 1 == pixel || x == pixel || x + 1 == pixel;
 }
 
-void run(std::istream& is) {
+void run(std::istream&& is) {
     size_t sum = 0;
     std::istream_iterator<instr> begin(is), end;
     for (vm vm(begin, end); !vm.halted(); vm.tick()) {
@@ -69,6 +69,5 @@ void run(std::istream& is) {
 
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day10 <file>");
-    std::ifstream ifs(argv[1]);
-    run(ifs);
+    run(std::ifstream(argv[1]));
 }
