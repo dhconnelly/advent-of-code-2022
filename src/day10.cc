@@ -1,148 +1,82 @@
-#include <algorithm>
-#include <cinttypes>
-#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <iterator>
-#include <optional>
-#include <string>
-#include <unordered_set>
-#include <vector>
 
 #include "util.h"
 
-enum class opcode : int64_t {
+enum class opcode {
     addx = 0,
     noop = 1,
 };
 
-constexpr int64_t duration(opcode op) {
-    switch (op) {
-        case opcode::addx: return 2;
-        case opcode::noop: return 1;
-    }
-}
+constexpr int duration(opcode op) { return op == opcode::addx ? 2 : 1; }
 
 struct instr {
     opcode op;
-    int64_t arg;
+    int arg;
 };
 
 std::istream& operator>>(std::istream& is, instr& i) {
-    std::string op;
-    if (!(is >> op)) return is;
-    if (op == "addx") {
-        i.op = opcode::addx;
-        return is >> i.arg;
-    } else {
-        i.op = opcode::noop;
-        return is;
-    }
+    char ch;
+    is >> ch;
+    i.op = ch == 'a' ? opcode::addx : opcode::noop;
+    for (int i = 0; i < 3; i++) is >> ch;
+    if (i.op == opcode::addx) is >> i.arg;
+    return is;
 }
-
-struct instr_state {
-    instr i;
-    size_t ticks_remaining;
-};
 
 enum class vm_state {
     executing,
     halted,
 };
 
+template <typename ProgramIt>
 class vm {
 public:
-    explicit vm(std::vector<instr> program) : program_(program) {}
-    int64_t cycle() const { return cycle_; }
-    int64_t x() const { return x_; }
+    vm(ProgramIt it, ProgramIt end) : it_(it), end_(end) {
+        state_ = it == end ? vm_state::halted : vm_state::executing;
+        if (state_ != vm_state::halted) remaining_ = duration(it_->op);
+    }
+    int cycle() const { return cycle_; }
+    int x() const { return x_; }
     bool halted() const { return state_ == vm_state::halted; }
-    int64_t signal() const { return cycle_ * x_; }
-    bool start();
-    void tick();
+    void tick() {
+        if (state_ == vm_state::halted) die("halted");
+        if (--remaining_ == 0) {
+            if (it_->op == opcode::addx) x_ += it_->arg;
+            if (++it_ == end_) state_ = vm_state::halted;
+            else remaining_ = duration(it_->op);
+        }
+        cycle_++;
+    }
 
 private:
-    void load();
-    void log();
-
-    size_t pc_;
-    std::vector<instr> program_;
-    int64_t x_;
-    int64_t cycle_;
-    vm_state state_ = vm_state::halted;
-    instr_state istate_;
+    vm_state state_;
+    ProgramIt it_, end_;
+    int cycle_ = 1, remaining_;
+    int x_ = 1;
 };
 
-void vm::load() {
-    if (state_ == vm_state::halted) return;
-    pc_++;
-    if (pc_ == program_.size()) {
-        state_ = vm_state::halted;
-    } else {
-        istate_.i = program_[pc_];
-        istate_.ticks_remaining = duration(program_[pc_].op);
-    }
-}
-
-void vm::log() {
-    std::cout << "[" << cycle_ << " x = " << x_ << "] ";
-    switch (istate_.i.op) {
-        case opcode::addx: std::cout << "addx " << istate_.i.arg; break;
-        case opcode::noop: std::cout << "noop";
-    }
-    std::cout << std::endl;
-}
-
-bool sprite_active(int64_t pixel, const vm& vm) {
-    int64_t x = vm.x();
+template <typename T>
+bool sprite_active(int pixel, const vm<T>& vm) {
+    int x = vm.x();
     return x - 1 == pixel || x == pixel || x + 1 == pixel;
 }
 
-bool vm::start() {
-    if (program_.empty()) return false;
-    pc_ = 0;
-    x_ = 1;
-    cycle_ = 1;
-    state_ = vm_state::executing;
-    istate_.i = program_[pc_];
-    istate_.ticks_remaining = duration(program_[pc_].op);
-    return true;
-}
-
-void vm::tick() {
-    if (state_ == vm_state::halted) die("halted");
-    if (getenv("LOG")) log();
-    istate_.ticks_remaining--;
-    if (istate_.ticks_remaining != 0) {
-        // do nothing
-    } else {
-        if (istate_.i.op == opcode::addx) x_ += istate_.i.arg;
-        load();
-    }
-    cycle_++;
-}
-
-int64_t signal_sum(std::istream& is,
-                   const std::unordered_set<int64_t>& cycles) {
+void run(std::istream& is) {
     size_t sum = 0;
-    std::vector<instr> program((std::istream_iterator<instr>(is)),
-                               (std::istream_iterator<instr>()));
-    vm vm(program);
-    if (!vm.start()) die("bad program");
-    for (int i = 0; !vm.halted(); i++) {
-        if ((i % 40) == 0) {
-            i = 0;
-            std::cout << std::endl;
-        }
-        std::cout << (sprite_active(i, vm) ? '#' : '.');
-        if (cycles.count(vm.cycle())) sum += vm.signal();
-        vm.tick();
+    std::istream_iterator<instr> begin(is), end;
+    for (vm vm(begin, end); !vm.halted(); vm.tick()) {
+        int pixel = (vm.cycle() - 1) % 40;
+        if (vm.cycle() > 1 && pixel == 0) std::cout << std::endl;
+        std::cout << (sprite_active(pixel, vm) ? '#' : ' ');
+        if (auto c = vm.cycle(); c > 1 && (c - 20) % 40 == 0) sum += c * vm.x();
     }
-    std::cout << std::endl;
-    return sum;
+    std::cout << std::endl << sum << std::endl;
 }
 
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day10 <file>");
     std::ifstream ifs(argv[1]);
-    std::cout << signal_sum(ifs, {20, 60, 100, 140, 180, 220}) << std::endl;
+    run(ifs);
 }
