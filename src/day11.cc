@@ -71,9 +71,7 @@ std::list<int64_t> parse_items(const std::string& s) {
     std::list<int64_t> items;
     static const std::regex item_pat(R"((, )?(\d+))");
     std::sregex_iterator begin(s.begin(), s.end(), item_pat), end;
-    for (auto it = begin; it != end; ++it) {
-        items.push_back(int_match(*it, 2));
-    }
+    for (auto it = begin; it != end; ++it) items.push_back(int_match(*it, 2));
     return items;
 }
 
