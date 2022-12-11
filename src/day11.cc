@@ -53,6 +53,20 @@ void round(std::vector<monkey>& monkeys, int modulus, bool reduce_stress) {
     for (auto& monkey : monkeys) turn(monkeys, monkey, modulus, reduce_stress);
 }
 
+int64_t monkey_business(const std::vector<monkey>& monkeys) {
+    std::vector monkeys2(monkeys);
+    std::sort(monkeys2.begin(), monkeys2.end(), [](auto& m1, auto& m2) {
+        return m1.inspections > m2.inspections;
+    });
+    return monkeys2[0].inspections * monkeys2[1].inspections;
+}
+
+int modulus(const std::vector<monkey>& monkeys) {
+    return std::accumulate(
+        monkeys.begin(), monkeys.end(), 1,
+        [](int mod, auto& m) { return mod * m.test_modulus; });
+}
+
 std::list<item> parse_items(const std::string& s) {
     // todo: regex
     std::list<item> items;
@@ -119,20 +133,6 @@ std::vector<monkey> parse(std::istream&& is) {
         monkeys.push_back({i, items, op, test_modulus, true_dest, false_dest});
     }
     return monkeys;
-}
-
-int64_t monkey_business(const std::vector<monkey>& monkeys) {
-    std::vector monkeys2(monkeys);
-    std::sort(monkeys2.begin(), monkeys2.end(), [](auto& m1, auto& m2) {
-        return m1.inspections > m2.inspections;
-    });
-    return monkeys2[0].inspections * monkeys2[1].inspections;
-}
-
-int modulus(const std::vector<monkey>& monkeys) {
-    return std::accumulate(
-        monkeys.begin(), monkeys.end(), 1,
-        [](int mod, auto& m) { return mod * m.test_modulus; });
 }
 
 int main(int argc, char* argv[]) {
