@@ -4,11 +4,7 @@
 
 #include "util.h"
 
-enum class opcode {
-    addx = 0,
-    noop = 1,
-};
-
+enum class opcode { addx, noop };
 constexpr int duration(opcode op) { return op == opcode::addx ? 2 : 1; }
 
 struct instr {
@@ -25,33 +21,29 @@ std::istream& operator>>(std::istream& is, instr& i) {
     return is;
 }
 
-enum class vm_state {
-    executing,
-    halted,
-};
-
 template <typename ProgramIt>
 class vm {
 public:
+    enum class state { executing, halted };
     vm(ProgramIt it, ProgramIt end) : it_(it), end_(end) {
-        state_ = it == end ? vm_state::halted : vm_state::executing;
-        if (state_ != vm_state::halted) remaining_ = duration(it_->op);
+        state_ = it == end ? state::halted : state::executing;
+        if (state_ != state::halted) remaining_ = duration(it_->op);
     }
     int cycle() const { return cycle_; }
     int x() const { return x_; }
-    bool halted() const { return state_ == vm_state::halted; }
+    bool halted() const { return state_ == state::halted; }
     void tick() {
-        if (state_ == vm_state::halted) die("halted");
+        if (state_ == state::halted) die("halted");
         if (--remaining_ == 0) {
             if (it_->op == opcode::addx) x_ += it_->arg;
-            if (++it_ == end_) state_ = vm_state::halted;
+            if (++it_ == end_) state_ = state::halted;
             else remaining_ = duration(it_->op);
         }
         cycle_++;
     }
 
 private:
-    vm_state state_;
+    state state_;
     ProgramIt it_, end_;
     int cycle_ = 1, remaining_;
     int x_ = 1;
