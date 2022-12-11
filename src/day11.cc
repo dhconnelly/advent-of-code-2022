@@ -1,3 +1,4 @@
+#include <cinttypes>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -13,63 +14,43 @@ enum class binary_op { add, mul };
 struct operation {
     binary_op op;
     arg_type arg_types[2];
-    int lit_vals[2];
+    int64_t lit_vals[2];
 };
-
-int evaluate(const operation& op, int old) {
-    int left = op.arg_types[0] == arg_type::lit ? op.lit_vals[0] : old;
-    int right = op.arg_types[1] == arg_type::lit ? op.lit_vals[1] : old;
+int64_t evaluate(const operation& op, int64_t old) {
+    int64_t left = op.arg_types[0] == arg_type::lit ? op.lit_vals[0] : old;
+    int64_t right = op.arg_types[1] == arg_type::lit ? op.lit_vals[1] : old;
     return op.op == binary_op::add ? left + right : left * right;
 }
 
 struct item {
-    int worry_level;
+    int64_t worry_level;
 };
 
 struct monkey {
     int id;
     std::list<item> items;
     operation worry_operation;
-    int test_modulus;
+    int64_t test_modulus;
     int true_dest, false_dest;
     int inspections = 0;
 };
 
-void turn(std::vector<monkey>& monkeys, monkey& m) {
-    std::cout << "Monkey " << m.id << std::endl;
+void turn(std::vector<monkey>& monkeys, monkey& m, int modulus,
+          bool reduce_stress) {
     for (auto it = m.items.begin(); it != m.items.end();) {
         m.inspections++;
         item i = *it;
-        std::cout << "  inspects " << i.worry_level << std::endl;
         i.worry_level = evaluate(m.worry_operation, i.worry_level);
-        std::cout << "    -> " << i.worry_level << std::endl;
-        i.worry_level /= 3;
-        std::cout << "    -> " << i.worry_level << std::endl;
-        if (i.worry_level % m.test_modulus == 0) {
-            std::cout << "    true, thrown to " << m.true_dest << std::endl;
-            it = m.items.erase(it);
-            monkeys[m.true_dest].items.push_back(i);
-        } else {
-            std::cout << "    false, thrown to " << m.false_dest << std::endl;
-            it = m.items.erase(it);
-            monkeys[m.false_dest].items.push_back(i);
-        }
-    }
-    std::cout << std::endl;
-}
-
-void print(const std::vector<monkey>& monkeys) {
-    for (const auto& monkey : monkeys) {
-        std::cout << "Monkey " << monkey.id << ": ";
-        for (const auto& item : monkey.items)
-            std::cout << item.worry_level << ", ";
-        std::cout << std::endl;
+        if (reduce_stress) i.worry_level /= 3;
+        else i.worry_level %= modulus;
+        it = m.items.erase(it);
+        int dest = i.worry_level % m.test_modulus ? m.false_dest : m.true_dest;
+        monkeys[dest].items.push_back(i);
     }
 }
 
-void round(std::vector<monkey>& monkeys) {
-    for (auto& monkey : monkeys) turn(monkeys, monkey);
-    print(monkeys);
+void round(std::vector<monkey>& monkeys, int modulus, bool reduce_stress) {
+    for (auto& monkey : monkeys) turn(monkeys, monkey, modulus, reduce_stress);
 }
 
 std::list<item> parse_items(const std::string& s) {
@@ -78,12 +59,12 @@ std::list<item> parse_items(const std::string& s) {
     int from = 0;
     int to = s.find(", ");
     if (to == std::string::npos) to = s.size();
-    items.push_back(item{std::stoi(s.substr(from, to))});
+    items.push_back(item{std::stoll(s.substr(from, to))});
     while (to != s.size()) {
         from = to + 2;
         to = s.find(", ", from);
         if (to == std::string::npos) to = s.size();
-        items.push_back(item{std::stoi(s.substr(from, to))});
+        items.push_back(item{std::stoll(s.substr(from, to))});
     }
     return items;
 }
@@ -95,7 +76,7 @@ operation parse_operation(const std::string& s) {
     int lend = s.find(' ', lbegin);
     op.arg_types[0] = s[lbegin] == 'o' ? arg_type::old : arg_type::lit;
     if (op.arg_types[0] == arg_type::lit) {
-        op.lit_vals[0] = std::stoi(s.substr(lbegin, lend));
+        op.lit_vals[0] = std::stoll(s.substr(lbegin, lend));
     }
     char opc = s[lend + 1];
     op.op = opc == '*' ? binary_op::mul : binary_op::add;
@@ -103,7 +84,7 @@ operation parse_operation(const std::string& s) {
     int rend = s.size();
     op.arg_types[1] = s[rbegin] == 'o' ? arg_type::old : arg_type::lit;
     if (op.arg_types[1] == arg_type::lit) {
-        op.lit_vals[1] = std::stoi(s.substr(rbegin, rend));
+        op.lit_vals[1] = std::stoll(s.substr(rbegin, rend));
     }
     return op;
 }
@@ -127,7 +108,7 @@ std::vector<monkey> parse(std::istream&& is) {
         auto op = parse_operation(line.substr(line.find(':') + 2));
         // test
         eatline(is, line);
-        int test_modulus = std::stoi(line.substr(line.find("by") + 3));
+        int64_t test_modulus = std::stoll(line.substr(line.find("by") + 3));
         // destinations
         eatline(is, line);
         int true_dest = std::stoi(line.substr(line.find("monkey") + 7));
@@ -140,28 +121,7 @@ std::vector<monkey> parse(std::istream&& is) {
     return monkeys;
 }
 
-std::ostream& operator<<(std::ostream& os, const monkey& m) {
-    std::cout << "monkey " << m.id << std::endl;
-    std::cout << "items: ";
-    for (const auto& item : m.items) std::cout << item.worry_level << ", ";
-    std::cout << std::endl;
-    std::cout << "operation: ";
-    if (m.worry_operation.arg_types[0] == arg_type::old) std::cout << "old";
-    else std::cout << m.worry_operation.lit_vals[0];
-    std::cout << ' ';
-    if (m.worry_operation.op == binary_op::add) std::cout << '+';
-    else std::cout << '*';
-    std::cout << ' ';
-    if (m.worry_operation.arg_types[1] == arg_type::old) std::cout << "old";
-    else std::cout << m.worry_operation.lit_vals[1];
-    std::cout << std::endl;
-    std::cout << "test: " << m.test_modulus << std::endl;
-    std::cout << "true: " << m.true_dest << std::endl;
-    std::cout << "false: " << m.false_dest << std::endl;
-    return os;
-}
-
-int monkey_business(const std::vector<monkey>& monkeys) {
+int64_t monkey_business(const std::vector<monkey>& monkeys) {
     std::vector monkeys2(monkeys);
     std::sort(monkeys2.begin(), monkeys2.end(), [](auto& m1, auto& m2) {
         return m1.inspections > m2.inspections;
@@ -169,11 +129,21 @@ int monkey_business(const std::vector<monkey>& monkeys) {
     return monkeys2[0].inspections * monkeys2[1].inspections;
 }
 
+int modulus(const std::vector<monkey>& monkeys) {
+    return std::accumulate(
+        monkeys.begin(), monkeys.end(), 1,
+        [](int mod, auto& m) { return mod * m.test_modulus; });
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day11 <file>");
-    auto monkeys = parse(std::ifstream(argv[1]));
-    for (const auto& m : monkeys) std::cout << m << std::endl;
-    print(monkeys);
-    for (int i = 0; i < 20; i++) round(monkeys);
-    std::cout << monkey_business(monkeys) << std::endl;
+    auto monkeys1 = parse(std::ifstream(argv[1]));
+    auto monkeys2 = monkeys1;
+    int mod = modulus(monkeys1);
+
+    for (int i = 0; i < 20; i++) round(monkeys1, mod, true);
+    std::cout << monkey_business(monkeys1) << std::endl;
+
+    for (int i = 0; i < 10000; i++) round(monkeys2, mod, false);
+    std::cout << monkey_business(monkeys2) << std::endl;
 }
