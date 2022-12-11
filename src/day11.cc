@@ -79,21 +79,18 @@ std::list<item> parse_items(const std::string& s) {
 }
 
 operation parse_operation(const std::string& s) {
-    // todo: regex
+    static const std::regex expr_pat(R"(((\d+)|old) (\+|\*) ((\d+)|old))");
+    std::smatch m;
+    if (!std::regex_match(s, m, expr_pat)) die("bad operation: " + s);
     operation op;
-    int lbegin = s.find('=') + 2;
-    int lend = s.find(' ', lbegin);
-    op.arg_types[0] = s[lbegin] == 'o' ? arg_type::old : arg_type::lit;
+    op.arg_types[0] = *m[1].first == 'o' ? arg_type::old : arg_type::lit;
     if (op.arg_types[0] == arg_type::lit) {
-        op.lit_vals[0] = std::stoll(s.substr(lbegin, lend));
+        op.lit_vals[0] = std::stoll(m[1].str());
     }
-    char opc = s[lend + 1];
-    op.op = opc == '*' ? binary_op::mul : binary_op::add;
-    int rbegin = lend + 3;
-    int rend = s.size();
-    op.arg_types[1] = s[rbegin] == 'o' ? arg_type::old : arg_type::lit;
+    op.op = *m[3].first == '*' ? binary_op::mul : binary_op::add;
+    op.arg_types[1] = *m[4].first == 'o' ? arg_type::old : arg_type::lit;
     if (op.arg_types[1] == arg_type::lit) {
-        op.lit_vals[1] = std::stoll(s.substr(rbegin, rend));
+        op.lit_vals[1] = std::stoll(m[4].str());
     }
     return op;
 }
@@ -114,7 +111,7 @@ std::vector<monkey> parse(std::istream&& is) {
         auto items = parse_items(line.substr(line.find(':') + 2));
         // operation
         eatline(is, line);
-        auto op = parse_operation(line.substr(line.find(':') + 2));
+        auto op = parse_operation(line.substr(line.find('=') + 2));
         // test
         eatline(is, line);
         int64_t test_modulus = std::stoll(line.substr(line.find("by") + 3));
