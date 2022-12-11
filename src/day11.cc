@@ -1,3 +1,4 @@
+#include <charconv>
 #include <cinttypes>
 #include <fstream>
 #include <iostream>
@@ -6,6 +7,7 @@
 #include <numeric>
 #include <regex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "util.h"
@@ -59,12 +61,18 @@ int modulus(const std::vector<monkey>& monkeys) {
         [](int mod, auto& m) { return mod * m.test_modulus; });
 }
 
+int int_match(const std::smatch& m, int k) {
+    auto begin = &*m[k].first, end = &*m[k].second;
+    if (int x; std::from_chars(begin, end, x).ec == std::errc()) return x;
+    die("bad num");
+}
+
 std::list<int64_t> parse_items(const std::string& s) {
     std::list<int64_t> items;
     static const std::regex item_pat(R"((, )?(\d+))");
     std::sregex_iterator begin(s.begin(), s.end(), item_pat), end;
     for (auto it = begin; it != end; ++it) {
-        items.push_back(std::stoll((*it)[2].str()));
+        items.push_back(int_match(*it, 2));
     }
     return items;
 }
@@ -75,10 +83,10 @@ operation parse_operation(const std::string& s) {
     if (!std::regex_search(s, m, expr_pat)) die("bad operation: " + s);
     operation op;
     op.args[0] = *m[1].first == 'o' ? arg_type::old : arg_type::lit;
-    if (op.args[0] == arg_type::lit) op.lits[0] = std::stoll(m[1].str());
+    if (op.args[0] == arg_type::lit) op.lits[0] = int_match(m, 1);
     op.op = *m[3].first == '*' ? binary_op::mul : binary_op::add;
     op.args[1] = *m[4].first == 'o' ? arg_type::old : arg_type::lit;
-    if (op.args[1] == arg_type::lit) op.lits[1] = std::stoll(m[4].str());
+    if (op.args[1] == arg_type::lit) op.lits[1] = int_match(m, 4);
     return op;
 }
 
@@ -86,25 +94,23 @@ int parse_num(const std::string& s) {
     static const std::regex pat(R"((\d+))");
     std::smatch m;
     if (!std::regex_search(s, m, pat)) die("bad num");
-    return std::stoi(m[1].str());
+    return int_match(m, 1);
 }
 
 std::string& eatline(std::istream& is, std::string& buf) {
-    if (!std::getline(is, buf)) die(std::string("getline: ") + strerror(errno));
+    if (!std::getline(is, buf)) die(strerror(errno));
     return buf;
 }
 
 std::vector<monkey> parse(std::istream&& is) {
     std::vector<monkey> monkeys;
-    std::string line;
-    while (!is.eof()) {
-        eatline(is, line);
+    for (std::string line; !is.eof(); std::getline(is, line)) {
+        eatline(is, line);  // monkey number
         auto items = parse_items(eatline(is, line));
         auto op = parse_operation(eatline(is, line));
         int64_t test_modulus = parse_num(eatline(is, line));
         int true_dest = parse_num(eatline(is, line));
         int false_dest = parse_num(eatline(is, line));
-        std::getline(is, line);  // delimiter can be empty
         monkeys.push_back({items, op, test_modulus, true_dest, false_dest});
     }
     return monkeys;
