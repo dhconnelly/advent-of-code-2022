@@ -1,7 +1,8 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
-#include <regex>
+#include <list>
+#include <numeric>
 #include <string>
 #include <vector>
 
@@ -15,25 +16,65 @@ struct operation {
     int lit_vals[2];
 };
 
+int evaluate(const operation& op, int old) {
+    int left = op.arg_types[0] == arg_type::lit ? op.lit_vals[0] : old;
+    int right = op.arg_types[1] == arg_type::lit ? op.lit_vals[1] : old;
+    return op.op == binary_op::add ? left + right : left * right;
+}
+
 struct item {
     int worry_level;
 };
 
 struct monkey {
     int id;
-    std::vector<item> items;
+    std::list<item> items;
     operation worry_operation;
     int test_modulus;
     int true_dest, false_dest;
+    int inspections = 0;
 };
 
-void turn(std::vector<monkey>& monkeys, int i) {}
+void turn(std::vector<monkey>& monkeys, monkey& m) {
+    std::cout << "Monkey " << m.id << std::endl;
+    for (auto it = m.items.begin(); it != m.items.end();) {
+        m.inspections++;
+        item i = *it;
+        std::cout << "  inspects " << i.worry_level << std::endl;
+        i.worry_level = evaluate(m.worry_operation, i.worry_level);
+        std::cout << "    -> " << i.worry_level << std::endl;
+        i.worry_level /= 3;
+        std::cout << "    -> " << i.worry_level << std::endl;
+        if (i.worry_level % m.test_modulus == 0) {
+            std::cout << "    true, thrown to " << m.true_dest << std::endl;
+            it = m.items.erase(it);
+            monkeys[m.true_dest].items.push_back(i);
+        } else {
+            std::cout << "    false, thrown to " << m.false_dest << std::endl;
+            it = m.items.erase(it);
+            monkeys[m.false_dest].items.push_back(i);
+        }
+    }
+    std::cout << std::endl;
+}
 
-void round(std::vector<monkey>& monkeys) {}
+void print(const std::vector<monkey>& monkeys) {
+    for (const auto& monkey : monkeys) {
+        std::cout << "Monkey " << monkey.id << ": ";
+        for (const auto& item : monkey.items)
+            std::cout << item.worry_level << ", ";
+        std::cout << std::endl;
+    }
+}
 
-std::vector<item> parse_items(const std::string& s) {
+void round(std::vector<monkey>& monkeys) {
+    for (auto& monkey : monkeys) turn(monkeys, monkey);
+    print(monkeys);
+}
+
+std::list<item> parse_items(const std::string& s) {
     // todo: regex
-    std::vector<item> items;
+    std::list<item> items;
     int from = 0;
     int to = s.find(", ");
     if (to == std::string::npos) to = s.size();
@@ -74,7 +115,6 @@ void eatline(std::istream& is, std::string& buf) {
 std::vector<monkey> parse(std::istream&& is) {
     std::vector<monkey> monkeys;
     std::string line;
-    std::smatch m;
     for (int i = 0; !is.eof(); i++) {
         // header
         eatline(is, line);
@@ -121,9 +161,19 @@ std::ostream& operator<<(std::ostream& os, const monkey& m) {
     return os;
 }
 
+int monkey_business(const std::vector<monkey>& monkeys) {
+    std::vector monkeys2(monkeys);
+    std::sort(monkeys2.begin(), monkeys2.end(), [](auto& m1, auto& m2) {
+        return m1.inspections > m2.inspections;
+    });
+    return monkeys2[0].inspections * monkeys2[1].inspections;
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day11 <file>");
-    auto state = parse(std::ifstream(argv[1]));
-    for (const auto& m : state) std::cout << m << std::endl;
-    round(state);
+    auto monkeys = parse(std::ifstream(argv[1]));
+    for (const auto& m : monkeys) std::cout << m << std::endl;
+    print(monkeys);
+    for (int i = 0; i < 20; i++) round(monkeys);
+    std::cout << monkey_business(monkeys) << std::endl;
 }
