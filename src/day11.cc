@@ -4,6 +4,7 @@
 #include <iterator>
 #include <list>
 #include <numeric>
+#include <regex>
 #include <string>
 #include <vector>
 
@@ -68,17 +69,11 @@ int modulus(const std::vector<monkey>& monkeys) {
 }
 
 std::list<item> parse_items(const std::string& s) {
-    // todo: regex
     std::list<item> items;
-    int from = 0;
-    int to = s.find(", ");
-    if (to == std::string::npos) to = s.size();
-    items.push_back(item{std::stoll(s.substr(from, to))});
-    while (to != s.size()) {
-        from = to + 2;
-        to = s.find(", ", from);
-        if (to == std::string::npos) to = s.size();
-        items.push_back(item{std::stoll(s.substr(from, to))});
+    static const std::regex item_pat(R"((, )?(\d+))");
+    std::sregex_iterator begin(s.begin(), s.end(), item_pat), end;
+    for (auto it = begin; it != end; ++it) {
+        items.push_back(item{std::stoll((*it)[2].str())});
     }
     return items;
 }
