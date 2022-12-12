@@ -11,36 +11,13 @@
 
 using pt2 = std::pair<int, int>;
 using grid = std::vector<std::vector<int>>;
-
-std::tuple<grid, pt2, pt2> parse(std::istream&& is) {
-    grid g;
-    pt2 start, end;
-    std::string line;
-    for (int row = 0; std::getline(is, line); row++) {
-        g.emplace_back();
-        for (int col = 0; col < line.size(); col++) {
-            if (char ch = line[col]; ch == 'S') {
-                start = {row, col};
-                g.back().push_back(0);
-            } else if (ch == 'E') {
-                end = {row, col};
-                g.back().push_back('z' - 'a');
-            } else {
-                g.back().push_back(ch - 'a');
-            }
-        }
-    }
-    return {g, start, end};
-}
-
 pt2 add(pt2 a, pt2 b) { return {a.first + b.first, a.second + b.second}; }
+int at(const grid& g, pt2 pt) { return g[pt.first][pt.second]; }
 
 bool in_bounds(const grid& g, pt2 pt) {
     return pt.first >= 0 && pt.first < g.size() && pt.second >= 0 &&
            pt.second < g[0].size();
 }
-
-int at(const grid& g, pt2 pt) { return g[pt.first][pt.second]; }
 
 int shortest_path(const grid& g, pt2 start, pt2 end) {
     std::deque<std::pair<pt2, int>> q;
@@ -73,6 +50,27 @@ int shortest_overall(const grid& g, pt2 end) {
         }
     }
     return min;
+}
+
+std::tuple<grid, pt2, pt2> parse(std::istream&& is) {
+    grid g;
+    pt2 start, end;
+    std::string line;
+    for (int row = 0; std::getline(is, line); row++) {
+        g.emplace_back();
+        for (int col = 0; col < line.size(); col++) {
+            if (char ch = line[col]; ch == 'S') {
+                start = {row, col};
+                g.back().push_back(0);
+            } else if (ch == 'E') {
+                end = {row, col};
+                g.back().push_back('z' - 'a');
+            } else {
+                g.back().push_back(ch - 'a');
+            }
+        }
+    }
+    return {g, start, end};
 }
 
 int main(int argc, char* argv[]) {
