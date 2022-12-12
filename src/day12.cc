@@ -19,11 +19,11 @@ bool in_bounds(const grid& g, pt2 pt) {
            pt.second < g[0].size();
 }
 
-int shortest_path(const grid& g, pt2 start, pt2 end) {
-    std::deque<std::pair<pt2, int>> q;
-    q.push_back({start, 0});
+int shortest_path(const grid& g, const std::vector<pt2>& start, pt2 end) {
+    std::deque<std::pair<pt2, int>> q(start.size());
+    for (const pt2& pt : start) q.push_back({pt, 0});
     std::set<pt2> v;
-    v.insert(start);
+    for (const pt2& pt : start) v.insert(pt);
     while (!q.empty()) {
         auto [cur, dist] = q.front();
         int h = at(g, cur);
@@ -41,15 +41,14 @@ int shortest_path(const grid& g, pt2 start, pt2 end) {
     return std::numeric_limits<int>::max();
 }
 
-int shortest_overall(const grid& g, pt2 end) {
-    int min = std::numeric_limits<int>::max();
+std::vector<pt2> find_lowest(const grid& g) {
+    std::vector<pt2> pts;
     for (int row = 0; row < g.size(); row++) {
-        for (int col = 0; col < g[row].size(); col++) {
-            if (g[row][col] != 0) continue;
-            min = std::min(min, shortest_path(g, {row, col}, end));
+        for (int col = 0; col < g[col].size(); col++) {
+            if (g[row][col] == 0) pts.push_back({row, col});
         }
     }
-    return min;
+    return pts;
 }
 
 std::tuple<grid, pt2, pt2> parse(std::istream&& is) {
@@ -76,6 +75,6 @@ std::tuple<grid, pt2, pt2> parse(std::istream&& is) {
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day12 <file>");
     auto [g, start, end] = parse(std::ifstream(argv[1]));
-    std::cout << shortest_path(g, start, end) << std::endl;
-    std::cout << shortest_overall(g, end) << std::endl;
+    std::cout << shortest_path(g, {start}, end) << std::endl;
+    std::cout << shortest_path(g, find_lowest(g), end) << std::endl;
 }
