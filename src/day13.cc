@@ -22,20 +22,17 @@ struct item {
         p.push_back(*this);
         return p;
     }
-};
 
-void print(const item& i) {
-    switch (i.typ) {
-        case item::type::num: std::cout << i.num << ' '; break;
-        case item::type::packet:
-            std::cout << '(';
-            for (int j = 0; j < i.p.size(); j++) print(i.p[j]);
-            std::cout << ')';
-            break;
+    friend bool operator==(const item& left, const item& right) {
+        switch (left.typ) {
+            case item::type::num:
+                return right.typ == item::type::num && left.num == right.num;
+            case item::type::packet:
+                if (right.typ != item::type::packet) return false;
+                return left.p == right.p;
+        }
     }
-}
-
-void print(const packet& p) { print(item::from(p)); }
+};
 
 packet parse_packet(std::istream& is);
 item parse_item(std::istream& is) {
@@ -69,38 +66,17 @@ std::vector<std::pair<packet, packet>> parse(std::istream&& is) {
 
 int compare(const item& left, const item& right);
 int compare(const packet& left, const packet& right) {
-    std::cout << "comparing: ";
-    print(left);
-    std::cout << " and ";
-    print(right);
-    std::cout << std::endl;
     int i;
     for (i = 0; i < left.size() && i < right.size(); i++) {
-        if (int d = compare(left[i], right[i]); d < 0) {
-            std::cout << "left side smaller\n";
-            return -1;
-        } else if (d > 0) {
-            std::cout << "right side smaller\n";
-            return 1;
-        }
+        if (int d = compare(left[i], right[i]); d < 0) return -1;
+        else if (d > 0) return 1;
     }
-    if (i == left.size() && i < right.size()) {
-        std::cout << "left ran out\n";
-        return -1;
-    }
-    if (i == right.size() && i < left.size()) {
-        std::cout << "right ran out\n";
-        return 1;
-    }
+    if (i == left.size() && i < right.size()) return -1;
+    if (i == right.size() && i < left.size()) return 1;
     return 0;
 }
 
 int compare(const item& left, const item& right) {
-    std::cout << "comparing: ";
-    print(left);
-    std::cout << " and ";
-    print(right);
-    std::cout << std::endl;
     if (left.typ == right.typ && right.typ == item::type::num) {
         return left.num - right.num;
     } else if (left.typ == right.typ && left.typ == item::type::packet) {
@@ -112,16 +88,37 @@ int compare(const item& left, const item& right) {
     }
 }
 
+std::vector<packet> combine_packets(
+    const std::vector<std::pair<packet, packet>>& pairs) {
+    std::vector<packet> ps;
+    for (const auto& [left, right] : pairs) {
+        ps.push_back(left);
+        ps.push_back(right);
+    }
+    return ps;
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day13 <file>");
     auto packet_pairs = parse(std::ifstream(argv[1]));
+
+    // part 1
     int sum = 0;
     for (int i = 0; i < packet_pairs.size(); i++) {
         const auto& [left, right] = packet_pairs[i];
-        if (compare(left, right) < 0) {
-            std::cout << "right order: " << i + 1 << std::endl;
-            sum += i + 1;
-        }
+        if (compare(left, right) < 0) sum += i + 1;
     }
     std::cout << sum << std::endl;
+
+    // part 2
+    auto all = combine_packets(packet_pairs);
+    auto div1 = item::from(item::from(2).to_packet()).to_packet();
+    auto div2 = item::from(item::from(6).to_packet()).to_packet();
+    all.push_back(div1);
+    all.push_back(div2);
+    std::sort(all.begin(), all.end(),
+              [](auto& l, auto& r) { return compare(l, r) < 0; });
+    auto i = std::find(all.begin(), all.end(), div1) - all.begin() + 1;
+    auto j = std::find(all.begin(), all.end(), div2) - all.begin() + 1;
+    std::cout << (i * j) << std::endl;
 }
