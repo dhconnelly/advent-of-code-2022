@@ -24,12 +24,10 @@ struct item {
     }
 
     friend bool operator==(const item& left, const item& right) {
+        if (left.typ != right.typ) return false;
         switch (left.typ) {
-            case item::type::num:
-                return right.typ == item::type::num && left.num == right.num;
-            case item::type::packet:
-                if (right.typ != item::type::packet) return false;
-                return left.p == right.p;
+            case item::type::num: return left.num == right.num;
+            case item::type::packet: return left.p == right.p;
         }
     }
 };
