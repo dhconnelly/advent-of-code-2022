@@ -94,11 +94,6 @@ int parse_num(const std::string& s) {
     return int_match(m, 1);
 }
 
-std::string& eatline(std::istream& is, std::string& buf) {
-    if (!std::getline(is, buf)) die(strerror(errno));
-    return buf;
-}
-
 std::vector<monkey> parse(std::istream&& is) {
     std::vector<monkey> monkeys;
     for (std::string line; !is.eof(); std::getline(is, line)) {
