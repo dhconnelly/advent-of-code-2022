@@ -1,4 +1,5 @@
 #include <charconv>
+#include <concepts>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -23,8 +24,7 @@ char char_of(tile t) {
     }
 }
 
-template <typename match>
-int int_match(match m) {
+int int_match(const std::ssub_match& m) {
     int val;
     auto result = std::from_chars<int>(&*m.first, &*m.second, val);
     if (result.ec != std::errc()) die("bad int: " + m.str());
@@ -34,8 +34,8 @@ int int_match(match m) {
 std::vector<pt> parse_path(const std::string& line) {
     std::vector<pt> p;
     static const std::regex pat(R"(( -> )?(\d+),(\d+))");
-    std::sregex_iterator begin(line.begin(), line.end(), pat), end;
-    for (auto cur = begin; cur != end; ++cur) {
+    for (std::sregex_iterator cur(line.begin(), line.end(), pat), end;
+         cur != end; ++cur) {
         p.push_back({int_match((*cur)[2]), int_match((*cur)[3])});
     }
     return p;
@@ -44,9 +44,7 @@ std::vector<pt> parse_path(const std::string& line) {
 void fill(grid& g, pt src, pt dst, tile t) {
     int dx = src.first < dst.first ? 1 : src.first > dst.first ? -1 : 0;
     int dy = src.second < dst.second ? 1 : src.second > dst.second ? -1 : 0;
-    for (int x = src.first, y = src.second; pt{x, y} != dst; x += dx, y += dy) {
-        g[{x, y}] = t;
-    }
+    for (pt p = src; p != dst; p.first += dx, p.second += dy) g[p] = t;
     g[dst] = t;
 }
 
@@ -60,27 +58,24 @@ grid parse(std::istream&& is) {
 }
 
 int max_depth(const grid& g) {
-    int max_y = 0;
-    for (auto [p, t] : g) {
-        if (t != tile::empty && p.second > max_y) max_y = p.second;
-    }
-    return max_y;
+    return std::accumulate(g.begin(), g.end(), 0, [](int max, auto& e) {
+        auto [p, t] = e;
+        return t != tile::empty && p.second > max ? p.second : max;
+    });
 }
 
 pt apply_gravity(grid& g, pt src) {
-    auto [x, y] = src;
-    if (g[{x, y + 1}] == tile::empty) return {x, y + 1};
-    if (g[{x - 1, y + 1}] == tile::empty) return {x - 1, y + 1};
-    if (g[{x + 1, y + 1}] == tile::empty) return {x + 1, y + 1};
-    return src;
+    if (auto [x, y] = src; g[{x, y + 1}] == tile::empty) return {x, y + 1};
+    else if (g[{x - 1, y + 1}] == tile::empty) return {x - 1, y + 1};
+    else if (g[{x + 1, y + 1}] == tile::empty) return {x + 1, y + 1};
+    else return src;
 }
 
 static constexpr pt kStart{500, 0};
 
 int drop_until(grid g, int max_y, std::function<bool(pt)> done) {
-    int sand;
-    pt p, q;
-    for (sand = 0; sand == 0 || !done(p); sand++) {
+    int sand = 0;
+    for (pt p, q; sand == 0 || !done(p); sand++) {
         g[p = kStart] = tile::sand;
         while ((q = apply_gravity(g, p)) != p && p.second < max_y) {
             std::swap(g[p], g[q]);
