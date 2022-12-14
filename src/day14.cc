@@ -13,7 +13,6 @@
 
 enum class tile : int { empty = 0, rock = 1, sand = 2 };
 using pt = std::pair<int, int>;
-using path = std::vector<pt>;
 using grid = std::map<pt, tile>;
 
 char char_of(tile t) {
@@ -32,13 +31,12 @@ int int_match(match m) {
     return val;
 }
 
-path parse_path(const std::string& line) {
-    path p;
+std::vector<pt> parse_path(const std::string& line) {
+    std::vector<pt> p;
     static const std::regex pat(R"(( -> )?(\d+),(\d+))");
     std::sregex_iterator begin(line.begin(), line.end(), pat), end;
     for (auto cur = begin; cur != end; ++cur) {
-        int x = int_match((*cur)[2]), y = int_match((*cur)[3]);
-        p.push_back({x, y});
+        p.push_back({int_match((*cur)[2]), int_match((*cur)[3])});
     }
     return p;
 }
@@ -56,31 +54,9 @@ grid parse(std::istream&& is) {
     grid g;
     for (std::string line; std::getline(is, line);) {
         auto l = parse_path(line);
-        for (int i = 1; i < l.size(); i++) {
-            fill(g, l[i - 1], l[i], tile::rock);
-        }
+        for (int i = 1; i < l.size(); i++) fill(g, l[i - 1], l[i], tile::rock);
     }
     return g;
-}
-
-void print(grid& g) {
-    int min_x = 500, max_x = 500, max_y = 0;
-    for (const auto& [p, t] : g) {
-        auto [x, y] = p;
-        min_x = std::min(min_x, x);
-        max_x = std::max(max_x, x);
-        max_y = std::max(max_y, y);
-    }
-    char ch;
-    for (int y = 0; y <= max_y; y++) {
-        for (int x = min_x; x <= max_x; x++) {
-            if (x == 500 && y == 0) ch = '+';
-            else ch = char_of(g[{x, y}]);
-            std::cout << ch;
-        }
-        std::cout << std::endl;
-    }
-    std::cout << std::endl;
 }
 
 int max_depth(const grid& g) {
@@ -91,12 +67,6 @@ int max_depth(const grid& g) {
     return max_y;
 }
 
-pt add_sand(grid& g) {
-    pt p{500, 1};
-    g[p] = tile::sand;
-    return p;
-}
-
 pt apply_gravity(grid& g, pt src) {
     auto [x, y] = src;
     if (g[{x, y + 1}] == tile::empty) return {x, y + 1};
@@ -105,22 +75,30 @@ pt apply_gravity(grid& g, pt src) {
     return src;
 }
 
+static constexpr pt kStart{500, 0};
+
+int drop_until(grid g, int max_y, std::function<bool(pt)> done) {
+    int sand;
+    pt p, q;
+    for (sand = 0; sand == 0 || !done(p); sand++) {
+        g[p = kStart] = tile::sand;
+        while ((q = apply_gravity(g, p)) != p && p.second < max_y) {
+            std::swap(g[p], g[q]);
+            p = q;
+        }
+    }
+    return sand;
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day14 <file>");
     auto g = parse(std::ifstream(argv[1]));
-    int depth = max_depth(g);
-    int sand;
-    for (sand = 0;; sand++) {
-        pt p = add_sand(g), q = p;
-        g[p] = tile::sand;
-        while (p.second < depth) {
-            q = apply_gravity(g, p);
-            if (q == p) break;
-            g[p] = tile::empty;
-            g[q] = tile::sand;
-            p = q;
-        }
-        if (p.second == depth) break;
-    }
-    std::cout << sand << std::endl;
+
+    int d = max_depth(g);
+    int until_freefall = drop_until(g, d, [=](pt p) { return p.second == d; });
+    std::cout << (until_freefall - 1) << std::endl;
+
+    int d2 = d + 1;
+    int until_filled = drop_until(g, d2, [](pt p) { return p == kStart; });
+    std::cout << until_filled << std::endl;
 }
