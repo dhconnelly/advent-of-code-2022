@@ -49,6 +49,7 @@ void fill(grid& g, pt src, pt dst, tile t) {
     for (int x = src.first, y = src.second; pt{x, y} != dst; x += dx, y += dy) {
         g[{x, y}] = t;
     }
+    g[dst] = t;
 }
 
 grid parse(std::istream&& is) {
@@ -82,8 +83,44 @@ void print(grid& g) {
     std::cout << std::endl;
 }
 
+int max_depth(const grid& g) {
+    int max_y = 0;
+    for (auto [p, t] : g) {
+        if (t != tile::empty && p.second > max_y) max_y = p.second;
+    }
+    return max_y;
+}
+
+pt add_sand(grid& g) {
+    pt p{500, 1};
+    g[p] = tile::sand;
+    return p;
+}
+
+pt apply_gravity(grid& g, pt src) {
+    auto [x, y] = src;
+    if (g[{x, y + 1}] == tile::empty) return {x, y + 1};
+    if (g[{x - 1, y + 1}] == tile::empty) return {x - 1, y + 1};
+    if (g[{x + 1, y + 1}] == tile::empty) return {x + 1, y + 1};
+    return src;
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day14 <file>");
     auto g = parse(std::ifstream(argv[1]));
-    print(g);
+    int depth = max_depth(g);
+    int sand;
+    for (sand = 0;; sand++) {
+        pt p = add_sand(g), q = p;
+        g[p] = tile::sand;
+        while (p.second < depth) {
+            q = apply_gravity(g, p);
+            if (q == p) break;
+            g[p] = tile::empty;
+            g[q] = tile::sand;
+            p = q;
+        }
+        if (p.second == depth) break;
+    }
+    std::cout << sand << std::endl;
 }
