@@ -14,8 +14,8 @@
 using pt = std::pair<int64_t, int64_t>;
 using interval = std::pair<int64_t, int64_t>;
 
-interval merge(interval a, interval b) {
-    return {std::min(a.first, b.first), std::max(a.second, b.second)};
+void merge(interval& a, interval b) {
+    a = {std::min(a.first, b.first), std::max(a.second, b.second)};
 }
 
 void merge(std::vector<interval>& intervals) {
@@ -26,29 +26,10 @@ void merge(std::vector<interval>& intervals) {
     merged.push_back(intervals[0]);
     for (size_t i = 1; i < intervals.size(); i++) {
         auto& back = merged.back();
-        if (intervals[i].first <= back.second) back = merge(back, intervals[i]);
+        if (intervals[i].first <= back.second) merge(back, intervals[i]);
         else merged.push_back(intervals[i]);
     }
     intervals = merged;
-}
-
-void clamp(std::vector<interval>& intervals, int64_t min_x, int64_t max_x) {
-    for (auto it = intervals.begin(); it != intervals.end();) {
-        if (it->first >= min_x) break;
-        else if (it->second < min_x) it = intervals.erase(it++);
-        else if (it->first < min_x) {
-            it->first = min_x;
-            break;
-        }
-    }
-    for (auto it = intervals.rbegin(); it != intervals.rend();) {
-        if (it->second <= max_x) break;
-        else if (it->first > max_x) intervals.erase((++it).base());
-        else if (it->second > max_x) {
-            it->second = max_x;
-            break;
-        }
-    }
 }
 
 int64_t dist(pt a, pt b) {
@@ -65,10 +46,12 @@ std::vector<interval> coverage(
         int64_t dy = std::abs(sensor.second - y);
         int64_t dx = d - dy;
         if (dx < 0) continue;  // doesn't cover row y at all
-        intervals.emplace_back(sensor.first - dx, sensor.first + dx);
+        int64_t from = sensor.first - dx, to = sensor.first + dx;
+        from = std::min(from, max_x), to = std::max(to, min_x);
+        if (to < from) continue;
+        intervals.emplace_back(from, to);
     }
     merge(intervals);
-    clamp(intervals, min_x, max_x);
     return intervals;
 }
 
@@ -81,14 +64,11 @@ int64_t covered(const std::vector<interval>& intervals) {
 
 int64_t beacons(const std::vector<std::pair<pt, pt>>& pairs, int64_t row) {
     std::set<pt> v;
-    int64_t beacons = 0;
-    for (auto [sensor, beacon] : pairs) {
-        if (beacon.second == row && !v.count(beacon)) {
-            beacons++;
-            v.insert(beacon);
-        }
-    }
-    return beacons;
+    return std::accumulate(pairs.begin(), pairs.end(), 0, [&](int sum, auto p) {
+        if (v.count(p.second) || p.second.second != row) return sum;
+        v.insert(p.second);
+        return sum + 1;
+    });
 }
 
 std::vector<std::pair<pt, pt>> parse(std::istream&& is) {
@@ -116,12 +96,11 @@ int main(int argc, char* argv[]) {
     // part 2
     int64_t max = 4000000, x = -1;
     for (y = 0; y <= max; y++) {
-        auto intervals = coverage(pairs, y, 0, max);
-        if (intervals.size() == 2) {
+        if (auto intervals = coverage(pairs, y, 0, max); intervals.size() > 1) {
             x = intervals[0].second + 1;
             break;
         }
     }
-    if (x < 0) die("not found");
+    if (x < 0) die("beacon not found");
     std::cout << (4000000 * x + y) << std::endl;
 }
