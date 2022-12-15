@@ -12,24 +12,6 @@
 #include "util.h"
 
 using pt = std::pair<int64_t, int64_t>;
-
-std::vector<std::pair<pt, pt>> parse(std::istream&& is) {
-    std::vector<std::pair<pt, pt>> pairs;
-    for (std::string line; std::getline(is, line);) {
-        static const std::regex pat(R"(x=(-?\d+), y=(-?\d+))");
-        std::sregex_iterator it(line.begin(), line.end(), pat);
-        pt sensor(int_match(*it, 1), int_match(*it, 2));
-        ++it;
-        pt beacon(int_match(*it, 1), int_match(*it, 2));
-        pairs.emplace_back(sensor, beacon);
-    }
-    return pairs;
-}
-
-int64_t dist(pt a, pt b) {
-    return std::abs(b.first - a.first) + std::abs(b.second - a.second);
-}
-
 using interval = std::pair<int64_t, int64_t>;
 
 interval merge(interval a, interval b) {
@@ -42,7 +24,7 @@ void merge(std::vector<interval>& intervals) {
     std::sort(intervals.begin(), intervals.end(),
               [](auto l, auto r) { return l.first < r.first; });
     merged.push_back(intervals[0]);
-    for (int i = 1; i < intervals.size(); i++) {
+    for (size_t i = 1; i < intervals.size(); i++) {
         auto& back = merged.back();
         if (intervals[i].first <= back.second) back = merge(back, intervals[i]);
         else merged.push_back(intervals[i]);
@@ -67,6 +49,10 @@ void clamp(std::vector<interval>& intervals, int64_t min_x, int64_t max_x) {
             break;
         }
     }
+}
+
+int64_t dist(pt a, pt b) {
+    return std::abs(b.first - a.first) + std::abs(b.second - a.second);
 }
 
 std::vector<interval> coverage(
@@ -103,6 +89,19 @@ int64_t beacons(const std::vector<std::pair<pt, pt>>& pairs, int64_t row) {
         }
     }
     return beacons;
+}
+
+std::vector<std::pair<pt, pt>> parse(std::istream&& is) {
+    std::vector<std::pair<pt, pt>> pairs;
+    for (std::string line; std::getline(is, line);) {
+        static const std::regex pat(R"(x=(-?\d+), y=(-?\d+))");
+        std::sregex_iterator it(line.begin(), line.end(), pat);
+        pt sensor(int_match(*it, 1), int_match(*it, 2));
+        ++it;
+        pt beacon(int_match(*it, 1), int_match(*it, 2));
+        pairs.emplace_back(sensor, beacon);
+    }
+    return pairs;
 }
 
 int main(int argc, char* argv[]) {
