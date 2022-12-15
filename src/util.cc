@@ -1,6 +1,7 @@
 #include "util.h"
 
 #include <cerrno>
+#include <charconv>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -13,4 +14,11 @@
 std::string& eatline(std::istream& is, std::string& buf) {
     if (!std::getline(is, buf)) die(strerror(errno));
     return buf;
+}
+
+int int_match(const std::smatch& m, int k) {
+    int val;
+    auto result = std::from_chars<int>(&*m[k].first, &*m[k].second, val);
+    if (result.ec != std::errc()) die("bad int: " + m.str());
+    return val;
 }

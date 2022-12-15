@@ -23,19 +23,12 @@ char char_of(tile t) {
     }
 }
 
-int int_match(const std::ssub_match& m) {
-    int val;
-    auto result = std::from_chars<int>(&*m.first, &*m.second, val);
-    if (result.ec != std::errc()) die("bad int: " + m.str());
-    return val;
-}
-
 std::vector<pt> parse_path(const std::string& line) {
     std::vector<pt> p;
     static const std::regex pat(R"(( -> )?(\d+),(\d+))");
     for (std::sregex_iterator cur(line.begin(), line.end(), pat), end;
          cur != end; ++cur) {
-        p.push_back({int_match((*cur)[2]), int_match((*cur)[3])});
+        p.push_back({int_match(*cur, 2), int_match(*cur, 3)});
     }
     return p;
 }

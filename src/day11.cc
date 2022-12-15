@@ -60,12 +60,6 @@ int modulus(const std::vector<monkey>& monkeys) {
         [](int mod, auto& m) { return mod * m.test_modulus; });
 }
 
-int int_match(const std::smatch& m, int k) {
-    auto begin = &*m[k].first, end = &*m[k].second;
-    if (int x; std::from_chars(begin, end, x).ec == std::errc()) return x;
-    die("bad num");
-}
-
 std::list<int64_t> parse_items(const std::string& s) {
     std::list<int64_t> items;
     static const std::regex item_pat(R"((, )?(\d+))");
