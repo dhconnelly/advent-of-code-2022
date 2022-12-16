@@ -1,26 +1,29 @@
 #include <deque>
 #include <fstream>
 #include <iostream>
-#include <map>
 #include <regex>
 #include <set>
 #include <string>
+#include <tuple>
+#include <unordered_map>
 #include <vector>
 
 #include "util.h"
 
-using connections = std::map<std::string, std::vector<std::string>>;
-using flow_rates = std::map<std::string, int64_t>;
+using connections = std::vector<std::vector<bool>>;
+using flow_rates = std::vector<int64_t>;
 
-std::pair<flow_rates, connections> parse(std::istream&& is) {
-    flow_rates rates;
-    connections conns;
+std::tuple<flow_rates, connections, int> parse(std::istream&& is) {
+    std::unordered_map<std::string, std::vector<std::string>> conns;
+    std::unordered_map<std::string, int64_t> rates;
+    std::unordered_map<std::string, int> idx;
     for (std::string line; std::getline(is, line);) {
         static const std::regex pat(
             R"(Valve (\w+) has flow rate=(\d+); tunnels? leads? to valves? (.*)$)");
         std::smatch m;
         if (!std::regex_match(line, m, pat)) die("bad line: " + line);
         auto valve = m[1].str();
+        idx[valve] = idx.size();
         rates[valve] = std::stoi(m[2].str());
         auto valves = m[3].str();
         static const std::regex valve_pat(R"((, )?(\w+))");
@@ -30,68 +33,71 @@ std::pair<flow_rates, connections> parse(std::istream&& is) {
             conns[valve].push_back((*it)[2].str());
         }
     }
-    return {rates, conns};
+    connections connsi(conns.size(), std::vector<bool>(conns.size(), false));
+    flow_rates ratesi(rates.size());
+    for (const auto& [k, vs] : conns) {
+        for (const auto& v : vs) connsi[idx[k]][idx[v]] = true;
+    }
+    for (const auto& [k, r] : rates) ratesi[idx[k]] = r;
+    return {ratesi, connsi, idx["AA"]};
 }
 
-using edge = std::pair<std::string, int64_t>;
-using edges = std::map<std::string, std::vector<edge>>;
-edges shortest_dists(const flow_rates& rates, const connections& conns) {
-    edges dists;
-    for (const auto& [valve, valves] : conns) {
-        auto& edges = dists[valve];
-        std::deque<edge> q;
-        q.emplace_back(valve, 0);
-        std::set<std::string> v;
-        v.insert(valve);
+using dists = std::vector<std::vector<int>>;
+dists shortest_dists(const flow_rates& rates, const connections& conns) {
+    dists dists(rates.size(), std::vector<int>(rates.size(), -1));
+    for (int i = 0; i < conns.size(); i++) {
+        auto& edges = dists[i];
+        dists[i][i] = 0;
+        std::deque<std::pair<int, int>> q;
+        q.emplace_back(i, 0);
+        std::vector<bool> v(rates.size(), false);
+        v[i] = true;
         while (!q.empty()) {
             auto [cur, d] = q.front();
             q.pop_front();
-            for (const auto& nbr : conns.at(cur)) {
-                if (v.count(nbr)) continue;
-                v.insert(nbr);
-                edges.emplace_back(nbr, d + 1);
-                q.emplace_back(nbr, d + 1);
+            for (int j = 0; j < conns.size(); j++) {
+                if (!conns[cur][j]) continue;
+                if (v[j]) continue;
+                v[j] = true;
+                edges[j] = d + 1;
+                q.emplace_back(j, d + 1);
             }
         }
     }
     return dists;
 }
 
-std::string key(const std::string& cur, int minute,
-                std::set<std::string>& open) {
-    std::string k(cur);
+std::string key(int cur, int minute, const std::vector<bool>& open) {
+    std::string k;
+    k.append(std::to_string(cur));
     k.push_back('|');
     k.append(std::to_string(minute));
     k.push_back('|');
-    for (const auto& valve : open) {
-        k.append(valve);
-        k.push_back(',');
-    }
+    for (const auto& valve : open) k.push_back(valve ? '1' : '0');
     return k;
 }
 
-int64_t max_released(const edges& edges, const flow_rates& rates,
-                     const std::string& cur, int minute, int max_minute,
-                     int64_t releasing, std::set<std::string>& open,
-                     std::map<std::string, int64_t>& memo) {
+int64_t max_released(const dists& edges, const flow_rates& rates, int cur,
+                     int minute, int max_minute, int64_t releasing,
+                     std::vector<bool>& open,
+                     std::unordered_map<std::string, int64_t>& memo) {
     if (minute > max_minute) return 0;
     std::string k = key(cur, minute, open);
     if (auto it = memo.find(k); it != memo.end()) return it->second;
     int64_t released = std::numeric_limits<int64_t>::min();
-    // std::cout << "minute " << minute << ", at " << cur << " releasing "
-    //<< releasing << std::endl;
-    for (const auto& [valve, dist] : edges.at(cur)) {
-        if (open.count(valve)) continue;
+    for (int i = 0; i < rates.size(); i++) {
+        int64_t dist = edges[cur][i];
+        if (dist < 0) continue;
+        if (open[i]) continue;
         if (minute + dist + 1 > max_minute) continue;
         // move there and open it
-        // std::cout << "opening " << valve << std::endl;
-        open.insert(valve);
+        open[i] = true;
         int64_t before = releasing * (dist + 1);
         int64_t after =
-            max_released(edges, rates, valve, minute + dist + 1, max_minute,
-                         releasing + rates.at(valve), open, memo);
+            max_released(edges, rates, i, minute + dist + 1, max_minute,
+                         releasing + rates.at(i), open, memo);
         released = std::max(released, before + after);
-        open.erase(valve);
+        open[i] = false;
     }
     // what if we do nothing
     released = std::max(released, releasing * (max_minute - minute + 1));
@@ -99,15 +105,15 @@ int64_t max_released(const edges& edges, const flow_rates& rates,
     return released;
 }
 
-int64_t max_released(const edges& edges, const flow_rates& rates) {
-    std::set<std::string> open;
-    std::map<std::string, int64_t> memo;
-    return max_released(edges, rates, "AA", 1, 30, 0, open, memo);
+int64_t max_released(const dists& edges, const flow_rates& rates, int start) {
+    std::vector<bool> open(rates.size(), false);
+    std::unordered_map<std::string, int64_t> memo;
+    return max_released(edges, rates, start, 1, 30, 0, open, memo);
 }
 
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day16 <file>");
-    auto [flow_rates, connections] = parse(std::ifstream(argv[1]));
+    auto [flow_rates, connections, start] = parse(std::ifstream(argv[1]));
     auto dists = shortest_dists(flow_rates, connections);
 
     /*
@@ -127,5 +133,5 @@ int main(int argc, char* argv[]) {
         }
     */
 
-    std::cout << max_released(dists, flow_rates) << std::endl;
+    std::cout << max_released(dists, flow_rates, start) << std::endl;
 }
