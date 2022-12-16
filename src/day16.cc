@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <optional>
 #include <regex>
 #include <set>
 #include <string>
@@ -72,38 +73,157 @@ std::string key(int cur, int minute, const std::vector<bool>& open) {
     return k;
 }
 
-int64_t max_released(const dists& dists, const flow_rates& rates, int cur,
-                     int minute, int max_minute, int64_t releasing,
-                     std::vector<bool>& open,
-                     std::unordered_map<std::string, int64_t>& memo) {
-    if (minute > max_minute) return 0;
-    std::string k = key(cur, minute, open);
-    if (auto it = memo.find(k); it != memo.end()) return it->second;
-    int64_t released = std::numeric_limits<int64_t>::min();
-    for (int i = 0; i < dists.size(); i++) {
-        int64_t dist = dists[cur][i];
-        if (dist < 0) continue;
-        if (open[i]) continue;
-        if (minute + dist + 1 > max_minute) continue;
-        // move there and open it
-        open[i] = true;
-        int64_t before = releasing * (dist + 1);
-        int64_t after =
-            max_released(dists, rates, i, minute + dist + 1, max_minute,
-                         releasing + rates.at(i), open, memo);
-        released = std::max(released, before + after);
-        open[i] = false;
+struct volcano_explorer {
+    enum class state { free, collecting };
+    state state;
+    int valve;
+    int mins_until_collected;
+};
+
+std::optional<int> tick(volcano_explorer& e) {
+    if (e.state == volcano_explorer::state::free) {
+        return {};
+    } else if (e.mins_until_collected > 0) {
+        e.mins_until_collected--;
+        return {};
+    } else {
+        e.state = volcano_explorer::state::free;
+        return e.valve;
     }
-    // what if we do nothing
-    released = std::max(released, releasing * (max_minute - minute + 1));
-    memo[k] = released;
-    return released;
 }
 
-int64_t max_released(const dists& dists, const flow_rates& rates, int start) {
-    std::vector<bool> open(rates.size(), false);
+struct volcano {
+    const dists dists;
+    const flow_rates rates;
+    std::vector<bool> open_valves;
+    volcano_explorer explorers[2];
+};
+
+std::string key(const volcano& v, int minute) {
+    std::string k;
+    k.append(std::to_string(minute));
+    k.push_back('|');
+    for (bool b : v.open_valves) k.push_back(b ? '1' : '0');
+    k.push_back('(');
+    for (int i = 0; i < 2; i++) {
+        const auto& e = v.explorers[i];
+        k.push_back(e.state == volcano_explorer::state::free ? '1' : '0');
+        k.push_back('|');
+        k.append(std::to_string(e.valve));
+        if (e.state == volcano_explorer::state::collecting) {
+            k.push_back('|');
+            k.append(std::to_string(e.mins_until_collected));
+        }
+        k.push_back(')');
+    }
+    return k;
+}
+
+int64_t releasing(const volcano& v) {
+    int64_t sum = 0;
+    for (int valve = 0; valve < v.open_valves.size(); valve++) {
+        if (v.open_valves[valve]) sum += v.rates[valve];
+    }
+    return sum;
+}
+
+bool targeting(const volcano_explorer& e, int valve) {
+    return e.state == volcano_explorer::state::collecting && e.valve == valve;
+}
+
+bool stuck(const volcano_explorer& explorer, int valve) {
+    return explorer.state == volcano_explorer::state::collecting &&
+           explorer.valve != valve;
+}
+
+void move(volcano_explorer& e, int valve, int dist) {
+    if (e.state == volcano_explorer::state::collecting) {
+        if (e.valve != valve) die("stuck");
+    } else {
+        e.state = volcano_explorer::state::collecting;
+        e.mins_until_collected = dist;
+        e.valve = valve;
+    }
+}
+
+bool all(const volcano& v) {
+    for (int i = 0; i < v.open_valves.size(); i++) {
+        if (v.rates[i] > 0 && !v.open_valves[i]) return false;
+    }
+    return true;
+}
+
+int64_t max_released(volcano& v, int minute, int max_minute,
+                     std::unordered_map<std::string, int64_t>& memo) {
+    if (minute > max_minute) return 0;
+    auto k = key(v, minute);
+    if (auto it = memo.find(k); it != memo.end()) return it->second;
+
+    // update current
+    auto e1 = v.explorers[0], e2 = v.explorers[1];
+    auto valve1 = tick(v.explorers[0]);
+    if (valve1.has_value()) {
+        v.open_valves[*valve1] = true;
+    }
+    int64_t released = releasing(v);
+    // auto valve2 = tick(v.explorers[1]);
+    // if (valve2.has_value()) v.open_valves[*valve2] = true;
+
+    // try not moving
+    int64_t max_after =
+        all(v) ? max_released(v, minute + 1, max_minute, memo) : 0;
+
+    // try moving
+    for (int valve1 = 0; valve1 < v.open_valves.size(); valve1++) {
+        for (int valve2 = 0; valve2 < v.open_valves.size(); valve2++) {
+            if (valve1 == valve2) continue;
+            if (v.open_valves[valve1] || v.open_valves[valve2]) continue;
+            auto e1 = v.explorers[0], e2 = v.explorers[1];
+            if (targeting(e1, valve2) || targeting(e2, valve1)) continue;
+            if (stuck(e1, valve1) ||
+                (e1.valve == valve1 &&
+                 e1.state == volcano_explorer::state::free)) {
+                continue;
+            }
+            // if (stuck(e2, valve2) ||
+            //(e2.valve == valve2 &&
+            // e2.state == volcano_explorer::state::free)) {
+            // continue;
+            //}
+            int64_t dist1 = v.dists[e1.valve][valve1],
+                    dist2 = v.dists[e2.valve][valve2];
+            if (dist1 < 0 || dist2 < 0) continue;
+
+            move(v.explorers[0], valve1, dist1);
+            // move(v.explorers[1], valve2, dist2);
+            max_after = std::max(max_after,
+                                 max_released(v, minute + 1, max_minute, memo));
+            v.explorers[0] = e1, v.explorers[1] = e2;
+        }
+    }
+
+    // reset
+    if (valve1.has_value()) {
+        v.open_valves[*valve1] = false;
+        v.explorers[0] = e1;
+    }
+    // if (valve2.has_value()) {
+    // v.open_valves[*valve2] = false;
+    // v.explorers[1] = e2;
+    //}
+
+    memo[k] = released + max_after;
+    return released + max_after;
+}
+
+int64_t max_released(const dists& dists, const flow_rates& rates, int start,
+                     int max_minute) {
+    volcano v{.dists = dists, .rates = rates};
+    v.open_valves.resize(rates.size());
+    v.explorers[0] = {volcano_explorer::state::free, start, 0};
+    v.explorers[1] = {volcano_explorer::state::free, start, 0};
     std::unordered_map<std::string, int64_t> memo;
-    return max_released(dists, rates, start, 1, 30, 0, open, memo);
+    return max_released(v, 1, max_minute, memo);
 }
 
 std::pair<flow_rates_map, connections_map> parse(std::istream&& is) {
@@ -132,5 +252,5 @@ int main(int argc, char* argv[]) {
     auto [flow_rates_map, connections_map] = parse(std::ifstream(argv[1]));
     auto edges = shortest_dists(flow_rates_map, connections_map);
     auto [flow_rates, dists, start] = prune(flow_rates_map, edges);
-    std::cout << max_released(dists, flow_rates, start) << std::endl;
+    std::cout << max_released(dists, flow_rates, start, 30) << std::endl;
 }
