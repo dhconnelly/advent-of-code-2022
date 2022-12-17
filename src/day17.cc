@@ -218,5 +218,6 @@ int main(int argc, char* argv[]) {
     int64_t periods_height = periods * period_height;
     int64_t remaining_blocks = blocks_needed - (base + period_blocks);
     int64_t remaining_height = iterate(base + remaining_blocks) - base_height;
-    std::cout << (base_height + periods_height + remaining_height) << std::endl;
+    int64_t height2 = base_height + periods_height + remaining_height;
+    std::cout << height2 << std::endl;
 }
