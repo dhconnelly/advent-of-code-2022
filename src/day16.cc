@@ -97,7 +97,8 @@ int64_t releasing(const std::vector<bool>& open, const flow_rates& rates) {
 int64_t max_released(const dists& dists, const flow_rates& rates,
                      std::pair<explorer, explorer> es, int minute,
                      int max_minute, std::vector<bool>& open,
-                     std::unordered_map<int64_t, int64_t>& memo) {
+                     std::unordered_map<int64_t, int64_t>& memo,
+                     bool elephant) {
     if (minute > max_minute) return 0;
     auto k = key(es, minute, open);
     if (auto it = memo.find(k); it != memo.end()) return it->second;
@@ -117,7 +118,7 @@ int64_t max_released(const dists& dists, const flow_rates& rates,
     int64_t released = std::numeric_limits<int64_t>::min();
     for (int i = 0; i < dists.size(); i++) {
         for (int j = 0; j < dists.size(); j++) {
-            if (i == j) continue;
+            if (elephant && i == j) continue;
             auto next = es;
             int go = std::numeric_limits<int>::max();
             if (es.first.free) {
@@ -132,28 +133,30 @@ int64_t max_released(const dists& dists, const flow_rates& rates,
             } else {
                 go = std::min(go, es.first.remaining);
             }
-            if (es.second.free) {
-                int dist2 = dists[es.second.valve][j];
-                if (dist2 < 0) continue;
-                if (open[j]) continue;
-                // start moving
-                next.second.valve = j;
-                next.second.remaining = dist2 + 1;
-                next.second.free = false;
-                go = std::min(go, dist2 + 1);
-            } else {
-                go = std::min(go, es.second.remaining);
+            if (elephant) {
+                if (es.second.free) {
+                    int dist2 = dists[es.second.valve][j];
+                    if (dist2 < 0) continue;
+                    if (open[j]) continue;
+                    // start moving
+                    next.second.valve = j;
+                    next.second.remaining = dist2 + 1;
+                    next.second.free = false;
+                    go = std::min(go, dist2 + 1);
+                } else {
+                    go = std::min(go, es.second.remaining);
+                }
             }
             if (minute + go > max_minute) continue;
 
             // move there and open it
             int64_t before = per_tick * go;
             next.first.remaining -= go;
-            next.second.remaining -= go;
+            if (elephant) next.second.remaining -= go;
             int64_t after = max_released(dists, rates, next, minute + go,
-                                         max_minute, open, memo);
+                                         max_minute, open, memo, elephant);
             released = std::max(released, before + after);
-            if (!es.second.free) break;
+            if (!es.second.free || !elephant) break;
         }
         if (!es.first.free) break;
     }
@@ -165,11 +168,13 @@ int64_t max_released(const dists& dists, const flow_rates& rates,
     return released;
 }
 
-int64_t max_released(const dists& dists, const flow_rates& rates, int start) {
+int64_t max_released(const dists& dists, const flow_rates& rates, int start,
+                     int max_minutes, bool elephant) {
     std::vector<bool> open(rates.size(), false);
     std::unordered_map<int64_t, int64_t> memo;
     explorer e{.free = true, .remaining = 0, .valve = start};
-    return max_released(dists, rates, {e, e}, 1, 26, open, memo);
+    return max_released(dists, rates, {e, e}, 1, max_minutes, open, memo,
+                        elephant);
 }
 
 std::pair<flow_rates_map, connections_map> parse(std::istream&& is) {
@@ -198,5 +203,6 @@ int main(int argc, char* argv[]) {
     auto [flow_rates_map, connections_map] = parse(std::ifstream(argv[1]));
     auto edges = shortest_dists(flow_rates_map, connections_map);
     auto [flow_rates, dists, start] = prune(flow_rates_map, edges);
-    std::cout << max_released(dists, flow_rates, start) << std::endl;
+    std::cout << max_released(dists, flow_rates, start, 30, false) << std::endl;
+    std::cout << max_released(dists, flow_rates, start, 26, true) << std::endl;
 }
