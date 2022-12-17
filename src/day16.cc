@@ -173,7 +173,7 @@ int64_t max_released(const dists& dists, const flow_rates& rates, int start,
                      int max_minutes, bool elephant) {
     std::vector<bool> open(rates.size(), false);
     std::unordered_map<int64_t, int64_t> memo;
-    explorer e{.free = true, .remaining = 0, .valve = start};
+    explorer e{.valve = start, .remaining = 0, .free = true};
     return max_released(dists, rates, {e, e}, 1, max_minutes, open, memo,
                         elephant);
 }
