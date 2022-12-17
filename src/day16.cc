@@ -74,6 +74,7 @@ int16_t key(const explorer& e) {
 
 int64_t key(std::pair<explorer, explorer> es, int minute,
             const std::vector<bool>& open) {
+    if (es.first.valve < es.second.valve) es = {es.second, es.first};
     int64_t k = 0;
     for (int i = 0; i < open.size(); i++)
         if (open[i]) k |= (1 << i);
