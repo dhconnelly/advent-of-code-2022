@@ -63,29 +63,26 @@ std::tuple<flow_rates, dists, int> prune(const flow_rates_map& rates_map,
 }
 
 struct explorer {
-    int valve;
-    int remaining;
-    bool free;
+    int valve;      // 4 bits
+    int remaining;  // 5 bit
+    bool free;      // 1 bit
 };
 
-std::string key(std::pair<explorer, explorer> es, int minute,
-                const std::vector<bool>& open) {
-    std::string k;
-    k.append(std::to_string(es.first.valve));
-    k.push_back('|');
-    k.append(std::to_string(es.first.remaining));
-    k.push_back('|');
-    k.push_back(es.first.free ? '1' : '0');
-    k.push_back('|');
-    k.append(std::to_string(es.second.valve));
-    k.push_back('|');
-    k.append(std::to_string(es.second.remaining));
-    k.push_back('|');
-    k.push_back(es.second.free ? '1' : '0');
-    k.push_back('|');
-    k.append(std::to_string(minute));
-    k.push_back('|');
-    for (const auto& valve : open) k.push_back(valve ? '1' : '0');
+int16_t key(const explorer& e) {
+    return (e.valve << 6) | (e.remaining << 1) | (e.free);
+}
+
+int64_t key(std::pair<explorer, explorer> es, int minute,
+            const std::vector<bool>& open) {
+    int64_t k = 0;
+    for (int i = 0; i < open.size(); i++)
+        if (open[i]) k |= (1 << i);
+    k <<= 16;
+    k |= key(es.first);
+    k <<= 16;
+    k |= key(es.second);
+    k <<= 4;
+    k |= minute;
     return k;
 }
 
@@ -100,9 +97,9 @@ int64_t releasing(const std::vector<bool>& open, const flow_rates& rates) {
 int64_t max_released(const dists& dists, const flow_rates& rates,
                      std::pair<explorer, explorer> es, int minute,
                      int max_minute, std::vector<bool>& open,
-                     std::unordered_map<std::string, int64_t>& memo) {
+                     std::unordered_map<int64_t, int64_t>& memo) {
     if (minute > max_minute) return 0;
-    std::string k = key(es, minute, open);
+    auto k = key(es, minute, open);
     if (auto it = memo.find(k); it != memo.end()) return it->second;
     bool flipped1 = false;
     if (!es.first.free && es.first.remaining == 0) {
@@ -156,7 +153,9 @@ int64_t max_released(const dists& dists, const flow_rates& rates,
             int64_t after = max_released(dists, rates, next, minute + go,
                                          max_minute, open, memo);
             released = std::max(released, before + after);
+            if (!es.second.free) break;
         }
+        if (!es.first.free) break;
     }
     if (flipped1) open[es.first.valve] = false;
     if (flipped2) open[es.second.valve] = false;
@@ -168,7 +167,7 @@ int64_t max_released(const dists& dists, const flow_rates& rates,
 
 int64_t max_released(const dists& dists, const flow_rates& rates, int start) {
     std::vector<bool> open(rates.size(), false);
-    std::unordered_map<std::string, int64_t> memo;
+    std::unordered_map<int64_t, int64_t> memo;
     explorer e{.free = true, .remaining = 0, .valve = start};
     return max_released(dists, rates, {e, e}, 1, 26, open, memo);
 }
