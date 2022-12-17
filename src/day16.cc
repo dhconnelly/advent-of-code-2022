@@ -110,30 +110,56 @@ int64_t max_released(const dists& dists, const flow_rates& rates,
         es.first.free = true;
         flipped1 = true;
     }
+    bool flipped2 = false;
+    if (!es.second.free && es.second.remaining == 0) {
+        open[es.second.valve] = true;
+        es.second.free = true;
+        flipped2 = true;
+    }
     int64_t per_tick = releasing(open, rates);
     int64_t released = std::numeric_limits<int64_t>::min();
     for (int i = 0; i < dists.size(); i++) {
-        auto next = es;
-        if (es.first.free) {
-            int64_t dist1 = dists[es.first.valve][i];
-            if (dist1 < 0) continue;
-            if (open[i]) continue;
-            // start moving
-            next.first.valve = i;
-            next.first.remaining = dist1 + 1;
-            next.first.free = false;
-        }
-        int go = dists[es.first.valve][i] + 1;  // 1
-        if (minute + go > max_minute) continue;
+        for (int j = 0; j < dists.size(); j++) {
+            if (i == j) continue;
+            auto next = es;
+            int go = std::numeric_limits<int>::max();
+            if (es.first.free) {
+                int dist1 = dists[es.first.valve][i];
+                if (dist1 < 0) continue;
+                if (open[i]) continue;
+                // start moving
+                next.first.valve = i;
+                next.first.remaining = dist1 + 1;
+                next.first.free = false;
+                go = std::min(go, dist1 + 1);
+            } else {
+                go = std::min(go, es.first.remaining);
+            }
+            if (es.second.free) {
+                int dist2 = dists[es.second.valve][j];
+                if (dist2 < 0) continue;
+                if (open[j]) continue;
+                // start moving
+                next.second.valve = j;
+                next.second.remaining = dist2 + 1;
+                next.second.free = false;
+                go = std::min(go, dist2 + 1);
+            } else {
+                go = std::min(go, es.second.remaining);
+            }
+            if (minute + go > max_minute) continue;
 
-        // move there and open it
-        int64_t before = per_tick * go;
-        next.first.remaining -= go;
-        int64_t after = max_released(dists, rates, next, minute + go,
-                                     max_minute, open, memo);
-        released = std::max(released, before + after);
+            // move there and open it
+            int64_t before = per_tick * go;
+            next.first.remaining -= go;
+            next.second.remaining -= go;
+            int64_t after = max_released(dists, rates, next, minute + go,
+                                         max_minute, open, memo);
+            released = std::max(released, before + after);
+        }
     }
     if (flipped1) open[es.first.valve] = false;
+    if (flipped2) open[es.second.valve] = false;
     // what if we do nothing
     released = std::max(released, per_tick * (max_minute - minute + 1));
     memo[k] = released;
@@ -144,7 +170,7 @@ int64_t max_released(const dists& dists, const flow_rates& rates, int start) {
     std::vector<bool> open(rates.size(), false);
     std::unordered_map<std::string, int64_t> memo;
     explorer e{.free = true, .remaining = 0, .valve = start};
-    return max_released(dists, rates, {e, e}, 1, 30, open, memo);
+    return max_released(dists, rates, {e, e}, 1, 26, open, memo);
 }
 
 std::pair<flow_rates_map, connections_map> parse(std::istream&& is) {
