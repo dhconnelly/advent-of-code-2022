@@ -68,13 +68,20 @@ struct explorer {
     bool free;
 };
 
-std::string key(const explorer& e, int minute, const std::vector<bool>& open) {
+std::string key(std::pair<explorer, explorer> es, int minute,
+                const std::vector<bool>& open) {
     std::string k;
-    k.append(std::to_string(e.valve));
+    k.append(std::to_string(es.first.valve));
     k.push_back('|');
-    k.append(std::to_string(e.remaining));
+    k.append(std::to_string(es.first.remaining));
     k.push_back('|');
-    k.push_back(e.free ? '1' : '0');
+    k.push_back(es.first.free ? '1' : '0');
+    k.push_back('|');
+    k.append(std::to_string(es.second.valve));
+    k.push_back('|');
+    k.append(std::to_string(es.second.remaining));
+    k.push_back('|');
+    k.push_back(es.second.free ? '1' : '0');
     k.push_back('|');
     k.append(std::to_string(minute));
     k.push_back('|');
@@ -90,42 +97,43 @@ int64_t releasing(const std::vector<bool>& open, const flow_rates& rates) {
     return sum;
 }
 
-int64_t max_released(const dists& dists, const flow_rates& rates, explorer e,
-                     int minute, int max_minute, std::vector<bool>& open,
+int64_t max_released(const dists& dists, const flow_rates& rates,
+                     std::pair<explorer, explorer> es, int minute,
+                     int max_minute, std::vector<bool>& open,
                      std::unordered_map<std::string, int64_t>& memo) {
     if (minute > max_minute) return 0;
-    std::string k = key(e, minute, open);
+    std::string k = key(es, minute, open);
     if (auto it = memo.find(k); it != memo.end()) return it->second;
-    bool flipped = false;
-    if (!e.free && e.remaining == 0) {
-        open[e.valve] = true;
-        e.free = true;
-        flipped = true;
+    bool flipped1 = false;
+    if (!es.first.free && es.first.remaining == 0) {
+        open[es.first.valve] = true;
+        es.first.free = true;
+        flipped1 = true;
     }
     int64_t per_tick = releasing(open, rates);
     int64_t released = std::numeric_limits<int64_t>::min();
     for (int i = 0; i < dists.size(); i++) {
-        explorer next = e;
-        if (e.free) {
-            int64_t dist = dists[e.valve][i];
-            if (dist < 0) continue;
+        auto next = es;
+        if (es.first.free) {
+            int64_t dist1 = dists[es.first.valve][i];
+            if (dist1 < 0) continue;
             if (open[i]) continue;
             // start moving
-            next.valve = i;
-            next.remaining = dist + 1;
-            next.free = false;
+            next.first.valve = i;
+            next.first.remaining = dist1 + 1;
+            next.first.free = false;
         }
-        int go = dists[e.valve][i] + 1;  // 1
+        int go = dists[es.first.valve][i] + 1;  // 1
         if (minute + go > max_minute) continue;
 
         // move there and open it
         int64_t before = per_tick * go;
-        next.remaining -= go;
+        next.first.remaining -= go;
         int64_t after = max_released(dists, rates, next, minute + go,
                                      max_minute, open, memo);
         released = std::max(released, before + after);
     }
-    if (flipped) open[e.valve] = false;
+    if (flipped1) open[es.first.valve] = false;
     // what if we do nothing
     released = std::max(released, per_tick * (max_minute - minute + 1));
     memo[k] = released;
@@ -136,7 +144,7 @@ int64_t max_released(const dists& dists, const flow_rates& rates, int start) {
     std::vector<bool> open(rates.size(), false);
     std::unordered_map<std::string, int64_t> memo;
     explorer e{.free = true, .remaining = 0, .valve = start};
-    return max_released(dists, rates, e, 1, 30, open, memo);
+    return max_released(dists, rates, {e, e}, 1, 30, open, memo);
 }
 
 std::pair<flow_rates_map, connections_map> parse(std::istream&& is) {
