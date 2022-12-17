@@ -26,7 +26,7 @@ using pt = std::pair<int64_t, int64_t>;  // row, col
 static constexpr pt kOblivion{-999, -999};
 
 struct entity {
-    int shape;
+    int64_t shape;
     pt pos;
 };
 
@@ -58,7 +58,7 @@ int64_t max_row(const chamber& c) {
     return it == c.end() ? 0 : it->pos.first + 1;
 }
 
-std::string row_at(const chamber& c, int row) {
+std::string row_at(const chamber& c, int64_t row) {
     std::string s(9, 0);
     s[0] = s[8] = '|';
     for (int64_t col = 0; col < 7; col++) s[col + 1] = at(c, {row, col});
@@ -72,11 +72,11 @@ void print(std::ostream& os, const chamber& c) {
     os << "+-------+" << std::endl;
 }
 
-pt insertion_point(const chamber& c, int shape) {
+pt insertion_point(const chamber& c, int64_t shape) {
     return {max_row(c) + kShapes[shape].size() + 2, 2};
 }
 
-void add_shape(chamber& c, int shape, pt pos) {
+void add_shape(chamber& c, int64_t shape, pt pos) {
     c.push_back(entity{.shape = shape, .pos = pos});
 }
 
@@ -104,7 +104,7 @@ bool fits(const chamber& c, const entity& e) {
     return true;
 }
 
-bool apply(chamber& c, int ei, char dir) {
+bool apply(chamber& c, int64_t ei, char dir) {
     pt orig = c[ei].pos;
     c[ei].pos = kOblivion;
     pt shifted = shift(orig, dir);
@@ -123,7 +123,7 @@ std::string parse(std::istream&& is) {
 }
 
 bool blocked(const chamber& c, int64_t row) {
-    for (int col = 0; col < 7; col++) {
+    for (int64_t col = 0; col < 7; col++) {
         if (at(c, {row, col}) == '.') return false;
     }
     return true;
@@ -131,10 +131,10 @@ bool blocked(const chamber& c, int64_t row) {
 
 pt add(pt a, pt b) { return {a.first + b.first, a.second + b.second}; }
 
-int min_reachable_row(chamber& c, int max, pt from, std::set<pt>& v) {
-    int min = from.first;
+int64_t min_reachable_row(chamber& c, int64_t max, pt from, std::set<pt>& v) {
+    int64_t min = from.first;
     static constexpr pt kDirs[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-    for (int i = 0; i < 4; i++) {
+    for (int64_t i = 0; i < 4; i++) {
         pt nbr = add(from, kDirs[i]);
         if (nbr.first < 0 || nbr.first > max) continue;
         if (nbr.second < 0 || nbr.second >= 7) continue;
@@ -145,106 +145,78 @@ int min_reachable_row(chamber& c, int max, pt from, std::set<pt>& v) {
     return min;
 }
 
-int min_reachable_row(chamber& c, int max, pt from) {
+int64_t min_reachable_row(chamber& c, int64_t max, pt from) {
     std::set<pt> v;
     return min_reachable_row(c, max, from, v);
 }
 
 void prune(chamber& c, pt from) {
-    int min_row = min_reachable_row(c, from.first, from);
+    int64_t min_row = min_reachable_row(c, from.first, from);
     if (min_row == 0) return;
-    int pruned =
+    int64_t pruned =
         std::erase_if(c, [=](auto e) { return e.pos.first < min_row; });
     if (pruned > 0) {
         for (auto& e : c) e.pos.first -= min_row;
     }
 }
 
-std::pair<int, int> height_when(const std::string& dirs,
-                                std::function<bool(int, const chamber&)> done) {
+int64_t height_when(
+    const std::string& dirs,
+    std::function<bool(int64_t, int64_t, const chamber&)> done) {
     chamber c;
-    int height = 0, n, dir;
-    for (n = 0, dir = 0, dir = 0; n == 0 || !done(n, c); n++) {
-        int height_before = max_row(c);
-        prune(c, {height_before + 3, 0});
-        int pruned = height_before - max_row(c);
+    int64_t height = 0, n, dir;
+    for (n = 0, dir = 0, dir = 0; n == 0 || !done(n, dir, c); n++) {
+        int64_t height_before = max_row(c);
+        prune(c, {height_before + 5, 0});
+        int64_t pruned = height_before - max_row(c);
         height += pruned;
 
-        int shape = n % 5;
+        int64_t shape = n % 5;
         add_shape(c, shape, insertion_point(c, shape));
         while (true) {
             apply(c, c.size() - 1, dirs[dir++ % dirs.size()]);
             if (!apply(c, c.size() - 1, 'v')) break;
         }
     }
-    return {height + max_row(c), n};
+    return height + max_row(c);
 }
 
-std::string key(int shape, const chamber& c) {
+std::string key(int64_t shape, int64_t dir, const chamber& c) {
     std::stringstream ss;
     print(ss, c);
-    ss << shape;
+    ss << shape << '|' << dir;
     return ss.str();
 }
 
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day17 <file>");
     auto dirs = parse(std::ifstream(argv[1]));
-    auto iterate = [&](int until) {
-        return height_when(dirs, [=](int n, auto) { return n == until; }).first;
+    auto iterate = [&](int64_t end) {
+        return height_when(dirs, [=](auto n, auto, auto) { return n == end; });
     };
-    auto result1 = iterate(2022);
-    std::cout << result1 << std::endl;
+    auto height1 = iterate(2022);
+    std::cout << height1 << std::endl;
 
     std::unordered_map<std::string, int64_t> seen;
     int64_t base = -1, period = -1;
-    height_when(dirs, [&](int n, auto& c) {
-        auto k = key(n % 5, c);
-        if (auto it = seen.find(k); it != seen.end()) {
-            base = it->second;
-            period = n - base;
-            return true;
-        }
-        seen.emplace(k, n);
-        return false;
-    });
-
+    int64_t height_base_period =
+        height_when(dirs, [&](int64_t n, int64_t dir, auto& c) {
+            auto k = key(n % 5, dir % dirs.size(), c);
+            if (auto it = seen.find(k); it != seen.end()) {
+                base = it->second;
+                period = n - base;
+                return true;
+            }
+            seen.emplace(k, n);
+            return false;
+        });
+    int64_t blocks_needed = 1000000000000;
     int64_t base_height = iterate(base);
-    int64_t period_height = iterate(base + period) - base_height;
-    int64_t periods = (1000000000000 - base) / period;
-    int64_t remaining_blocks = (1000000000000 - base) % period;
+    int64_t period_height = height_base_period - base_height;
+    int64_t periods = (blocks_needed - base) / period;
+    int64_t period_blocks = periods * period;
+    int64_t periods_height = periods * period_height;
+    int64_t remaining_blocks = blocks_needed - (base + period_blocks);
     int64_t remaining_height = iterate(base + remaining_blocks) - base_height;
-    int64_t giant_height =
-        base_height + periods * period_height + remaining_height;
-    std::cout << giant_height << std::endl;
-
-    /*
-        c = chamber{};
-        height = 0;
-        for (shape = 0, dir = 0; shape < 5000; shape++) {
-            auto pt = insertion_point(c, shape % 5);
-            height += prune(c, pt);
-            if (shape > 0 && c.empty()) break;
-            add_shape(c, shape % 5, pt);
-            while (true) {
-                apply(c, c.size() - 1, dirs[dir++ % dirs.size()]);
-                if (!apply(c, c.size() - 1, 'v')) break;
-            }
-        }
-        int n = shape + 1;
-        std::cout << "purged to empty with height " << height << " after " <<
-       shape
-                  << std::endl;
-
-        c = chamber{};
-        for (shape = 0, dir = 0; shape <= n; shape++) {
-            auto pt = insertion_point(c, shape % 5);
-            add_shape(c, shape % 5, pt);
-            while (true) {
-                apply(c, c.size() - 1, dirs[dir++ % dirs.size()]);
-                if (!apply(c, c.size() - 1, 'v')) break;
-            }
-        }
-        print(c);
-    */
+    std::cout << (base_height + periods_height + remaining_height) << std::endl;
 }
