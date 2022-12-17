@@ -159,29 +159,31 @@ void prune(chamber& c, pt from) {
     }
 }
 
+int height_when(const std::string& dirs,
+                std::function<bool(int, const chamber&)> done) {
+    chamber c;
+    int height = 0;
+    int n, dir;
+    for (n = 0, dir = 0; !done(n, c); n++) {
+        int shape = n % 5;
+        int height_before = max_row(c);
+        prune(c, {height_before + 1, 0});
+        height += height_before - max_row(c);
+        add_shape(c, shape, insertion_point(c, shape));
+        while (true) {
+            apply(c, c.size() - 1, dirs[dir++ % dirs.size()]);
+            if (!apply(c, c.size() - 1, 'v')) break;
+        }
+    }
+    return height + max_row(c);
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day17 <file>");
     auto dirs = parse(std::ifstream(argv[1]));
-    chamber c1, c2;
-    int height = 0;
-    int n, dir;
-    for (n = 0, dir = 0; n < 2022; n++) {
-        int shape = n % 5;
-        auto pt2 = insertion_point(c2, shape);
-        int height_before = max_row(c2);
-        prune(c2, pt2);
-        int height_after = max_row(c2);
-        height += height_before - height_after;
-        pt2 = insertion_point(c2, shape);
-        add_shape(c2, shape, pt2);
-        while (true) {
-            char d = dirs[dir % dirs.size()];
-            apply(c2, c2.size() - 1, d);
-            ++dir;
-            if (!apply(c2, c2.size() - 1, 'v')) break;
-        }
-    }
-    std::cout << (height + max_row(c2)) << std::endl;
+    std::cout << height_when(dirs, [](int n, const chamber& c) {
+        return n >= 2022;
+    }) << std::endl;
     /*
         c = chamber{};
         height = 0;
