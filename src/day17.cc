@@ -5,7 +5,9 @@
 #include <iostream>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "util.h"
@@ -63,12 +65,11 @@ std::string row_at(const chamber& c, int row) {
     return s;
 }
 
-void print(const chamber& c) {
+void print(std::ostream& os, const chamber& c) {
     for (int64_t row = max_row(c); row >= 0; row--) {
-        printf("%3lld", row);
-        std::cout << row_at(c, row) << std::endl;
+        os << row_at(c, row) << std::endl;
     }
-    std::cout << "   +-------+" << std::endl;
+    os << "+-------+" << std::endl;
 }
 
 pt insertion_point(const chamber& c, int shape) {
@@ -159,31 +160,64 @@ void prune(chamber& c, pt from) {
     }
 }
 
-int height_when(const std::string& dirs,
-                std::function<bool(int, const chamber&)> done) {
+std::pair<int, int> height_when(const std::string& dirs,
+                                std::function<bool(int, const chamber&)> done) {
     chamber c;
-    int height = 0;
-    int n, dir;
-    for (n = 0, dir = 0; !done(n, c); n++) {
-        int shape = n % 5;
+    int height = 0, n, dir;
+    for (n = 0, dir = 0, dir = 0; n == 0 || !done(n, c); n++) {
         int height_before = max_row(c);
-        prune(c, {height_before + 1, 0});
-        height += height_before - max_row(c);
+        prune(c, {height_before + 3, 0});
+        int pruned = height_before - max_row(c);
+        height += pruned;
+
+        int shape = n % 5;
         add_shape(c, shape, insertion_point(c, shape));
         while (true) {
             apply(c, c.size() - 1, dirs[dir++ % dirs.size()]);
             if (!apply(c, c.size() - 1, 'v')) break;
         }
     }
-    return height + max_row(c);
+    return {height + max_row(c), n};
+}
+
+std::string key(int shape, const chamber& c) {
+    std::stringstream ss;
+    print(ss, c);
+    ss << shape;
+    return ss.str();
 }
 
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day17 <file>");
     auto dirs = parse(std::ifstream(argv[1]));
-    std::cout << height_when(dirs, [](int n, const chamber& c) {
-        return n >= 2022;
-    }) << std::endl;
+    auto iterate = [&](int until) {
+        return height_when(dirs, [=](int n, auto) { return n == until; }).first;
+    };
+    auto result1 = iterate(2022);
+    std::cout << result1 << std::endl;
+
+    std::unordered_map<std::string, int64_t> seen;
+    int64_t base = -1, period = -1;
+    height_when(dirs, [&](int n, auto& c) {
+        auto k = key(n % 5, c);
+        if (auto it = seen.find(k); it != seen.end()) {
+            base = it->second;
+            period = n - base;
+            return true;
+        }
+        seen.emplace(k, n);
+        return false;
+    });
+
+    int64_t base_height = iterate(base);
+    int64_t period_height = iterate(base + period) - base_height;
+    int64_t periods = (1000000000000 - base) / period;
+    int64_t remaining_blocks = (1000000000000 - base) % period;
+    int64_t remaining_height = iterate(base + remaining_blocks) - base_height;
+    int64_t giant_height =
+        base_height + periods * period_height + remaining_height;
+    std::cout << giant_height << std::endl;
+
     /*
         c = chamber{};
         height = 0;
