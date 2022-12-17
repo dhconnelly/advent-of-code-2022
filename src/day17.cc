@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <array>
+#include <deque>
 #include <fstream>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -25,6 +27,11 @@ struct entity {
     int shape;
     pt pos;
 };
+
+std::ostream& operator<<(std::ostream& os, const entity& e) {
+    return os << "[e=" << e.shape << ", p=" << e.pos.first << ','
+              << e.pos.second << "]";
+}
 
 using chamber = std::vector<entity>;
 
@@ -49,19 +56,27 @@ int64_t max_row(const chamber& c) {
     return it == c.end() ? 0 : it->pos.first + 1;
 }
 
-void print(const chamber& c) {
-    for (int64_t row = max_row(c); row >= 0; row--) {
-        std::cout << '|';
-        for (int64_t col = 0; col < 7; col++) std::cout << at(c, {row, col});
-        std::cout << '|';
-        std::cout << std::endl;
-    }
-    std::cout << "+-------+" << std::endl;
+std::string row_at(const chamber& c, int row) {
+    std::string s(9, 0);
+    s[0] = s[8] = '|';
+    for (int64_t col = 0; col < 7; col++) s[col + 1] = at(c, {row, col});
+    return s;
 }
 
-void add_shape(chamber& c, int i) {
-    pt pos{max_row(c) + kShapes[i].size() + 2, 2};
-    c.push_back(entity{.shape = i, .pos = pos});
+void print(const chamber& c) {
+    for (int64_t row = max_row(c); row >= 0; row--) {
+        printf("%3lld", row);
+        std::cout << row_at(c, row) << std::endl;
+    }
+    std::cout << "   +-------+" << std::endl;
+}
+
+pt insertion_point(const chamber& c, int shape) {
+    return {max_row(c) + kShapes[shape].size() + 2, 2};
+}
+
+void add_shape(chamber& c, int shape, pt pos) {
+    c.push_back(entity{.shape = shape, .pos = pos});
 }
 
 pt shift(pt pos, char dir) {
@@ -106,17 +121,94 @@ std::string parse(std::istream&& is) {
     return eatline(is, dirs);
 }
 
+bool blocked(const chamber& c, int64_t row) {
+    for (int col = 0; col < 7; col++) {
+        if (at(c, {row, col}) == '.') return false;
+    }
+    return true;
+}
+
+pt add(pt a, pt b) { return {a.first + b.first, a.second + b.second}; }
+
+int min_reachable_row(chamber& c, int max, pt from, std::set<pt>& v) {
+    int min = from.first;
+    static constexpr pt kDirs[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+    for (int i = 0; i < 4; i++) {
+        pt nbr = add(from, kDirs[i]);
+        if (nbr.first < 0 || nbr.first > max) continue;
+        if (nbr.second < 0 || nbr.second >= 7) continue;
+        if (at(c, nbr) == '#' || v.count(nbr)) continue;
+        v.insert(nbr);
+        min = std::min(min, min_reachable_row(c, max, nbr, v));
+    }
+    return min;
+}
+
+int min_reachable_row(chamber& c, int max, pt from) {
+    std::set<pt> v;
+    return min_reachable_row(c, max, from, v);
+}
+
+void prune(chamber& c, pt from) {
+    int min_row = min_reachable_row(c, from.first, from);
+    if (min_row == 0) return;
+    int pruned =
+        std::erase_if(c, [=](auto e) { return e.pos.first < min_row; });
+    if (pruned > 0) {
+        for (auto& e : c) e.pos.first -= min_row;
+    }
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day17 <file>");
     auto dirs = parse(std::ifstream(argv[1]));
-    chamber c;
-    int dir = 0;
-    for (int shape = 0; shape < 2022; shape++) {
-        add_shape(c, shape % 5);
+    chamber c1, c2;
+    int height = 0;
+    int n, dir;
+    for (n = 0, dir = 0; n < 2022; n++) {
+        int shape = n % 5;
+        auto pt2 = insertion_point(c2, shape);
+        int height_before = max_row(c2);
+        prune(c2, pt2);
+        int height_after = max_row(c2);
+        height += height_before - height_after;
+        pt2 = insertion_point(c2, shape);
+        add_shape(c2, shape, pt2);
         while (true) {
-            apply(c, c.size() - 1, dirs[dir++ % dirs.size()]);
-            if (!apply(c, c.size() - 1, 'v')) break;
+            char d = dirs[dir % dirs.size()];
+            apply(c2, c2.size() - 1, d);
+            ++dir;
+            if (!apply(c2, c2.size() - 1, 'v')) break;
         }
     }
-    std::cout << max_row(c) << std::endl;
+    std::cout << (height + max_row(c2)) << std::endl;
+    /*
+        c = chamber{};
+        height = 0;
+        for (shape = 0, dir = 0; shape < 5000; shape++) {
+            auto pt = insertion_point(c, shape % 5);
+            height += prune(c, pt);
+            if (shape > 0 && c.empty()) break;
+            add_shape(c, shape % 5, pt);
+            while (true) {
+                apply(c, c.size() - 1, dirs[dir++ % dirs.size()]);
+                if (!apply(c, c.size() - 1, 'v')) break;
+            }
+        }
+        int n = shape + 1;
+        std::cout << "purged to empty with height " << height << " after " <<
+       shape
+                  << std::endl;
+
+        c = chamber{};
+        for (shape = 0, dir = 0; shape <= n; shape++) {
+            auto pt = insertion_point(c, shape % 5);
+            add_shape(c, shape % 5, pt);
+            while (true) {
+                apply(c, c.size() - 1, dirs[dir++ % dirs.size()]);
+                if (!apply(c, c.size() - 1, 'v')) break;
+            }
+        }
+        print(c);
+    */
 }
