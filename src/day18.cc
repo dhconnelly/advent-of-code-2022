@@ -1,13 +1,10 @@
-#include <algorithm>
 #include <cinttypes>
-#include <concepts>
 #include <fstream>
 #include <functional>
 #include <iostream>
 #include <iterator>
 #include <limits>
 #include <numeric>
-#include <optional>
 #include <set>
 #include <tuple>
 #include <vector>
@@ -43,25 +40,21 @@ pt3 upper_bound(const std::vector<pt3>& pts) {
 }
 
 using grid = std::vector<std::vector<std::vector<bool>>>;
-
 grid empty(size_t dx, size_t dy, size_t dz) {
     return std::vector(dx, std::vector(dy, std::vector<bool>(dz, false)));
 }
-
 grid grid_of(const std::vector<pt3>& pts) {
     auto [x, y, z] = upper_bound(pts);
     grid g = empty(x + 1, y + 1, z + 1);
     for (pt3 pt : pts) g[pt.x][pt.y][pt.z] = true;
     return g;
 }
-
 bool in_bounds(const grid& g, pt3 pt) {
     if (pt.x < 0 || pt.y < 0 || pt.z < 0) return false;
     if (pt.x >= g.size() || pt.y >= g[0].size() || pt.z >= g[0][0].size())
         return false;
     return true;
 }
-
 bool has(const grid& g, pt3 pt) {
     return in_bounds(g, pt) && g[pt.x][pt.y][pt.z];
 }
