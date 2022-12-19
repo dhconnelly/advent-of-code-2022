@@ -12,41 +12,9 @@
 
 enum class robot : int { ore = 0, clay = 1, obsidian = 2, geode = 3 };
 // TODO: are constexpr maps supported?
-static constexpr std::string_view kRobotNames[] = {"ore", "clay", "obsidian",
-                                                   "geode"};
-
-robot lookup(const std::string& name) {
-    for (int i = 0; i < 4; i++)
-        if (kRobotNames[i] == name) return static_cast<robot>(i);
-    die("bad robot: " + name);
-}
-
-int eat_id(std::string::const_iterator& begin,
-           std::string::const_iterator end) {
-    std::smatch m;
-    static const std::regex id_pat(R"(Blueprint (\d+):)");
-    if (!std::regex_search(begin, end, m, id_pat)) die("no id");
-    begin = m[0].second;
-    return std::stoi(m[1].str());
-}
-
-std::string eat_robot(std::string::const_iterator& begin,
-                      std::string::const_iterator& end) {
-    std::smatch m;
-    static const std::regex robot_pat(R"(Each (\w+) robot costs ([^\.]+)\.)");
-    if (!std::regex_search(begin, end, m, robot_pat)) die("no robot");
-    begin = m[2].first;
-    end = m[2].second;
-    return m[1].str();
-}
-
-std::pair<std::string, int> eat_cost(std::string::const_iterator& begin,
-                                     std::string::const_iterator end) {
-    std::smatch m;
-    static const std::regex cost_pat(R"((and )?(\d+) (\w+))");
-    if (!std::regex_search(begin, end, m, cost_pat)) die("no cost");
-    begin = m[0].second;
-    return {m[3].str(), std::stoi(m[2].str())};
+constexpr std::string_view kRobots[] = {"ore", "clay", "obsidian", "geode"};
+int lookup(const std::string_view name) {
+    return std::find(kRobots, kRobots + 4, name) - kRobots;
 }
 
 using cost = std::array<int, 4>;
@@ -54,32 +22,44 @@ struct blueprint {
     int id;
     std::array<cost, 4> costs;
 };
+
 std::ostream& operator<<(std::ostream& os, const blueprint& bp) {
     os << "[ id=" << bp.id << " |";
     for (int i = 0; i < 4; i++) {
-        os << ' ' << kRobotNames[i] << "=(";
+        os << ' ' << kRobots[i] << "=(";
         for (int j = 0; j < 4; j++) {
-            os << " " << kRobotNames[j] << ":" << bp.costs[i][j] << " ";
+            os << " " << kRobots[j] << ":" << bp.costs[i][j] << " ";
         }
         os << ") ";
     }
     return os << " ]";
 }
+
 std::istream& operator>>(std::istream& is, blueprint& bp) {
     std::string line;
     if (!std::getline(is, line)) return is;
-    auto it = line.cbegin(), end = line.cend();
-    bp.id = eat_id(it, end);
+    std::smatch m;
+
+    // id
+    static const std::regex id_pat(R"(Blueprint (\d+))");
+    if (!std::regex_search(line, m, id_pat)) die("no id");
+    bp.id = int_match(m, 1);
+
+    // robots
+    static const std::regex robot_pat(R"(Each (\w+) robot costs ([ \w\d]+)\.)");
+    std::sregex_iterator it(line.begin(), line.end(), robot_pat), end;
     for (int i = 0; i < 4; i++) {
+        if (it == end) die("bad robots: " + line);
+        auto m = *it++;
+        if (m[1].str() != kRobots[i]) die("bad robot: " + m[1].str());
+
+        // costs
         bp.costs[i] = {0, 0, 0, 0};
-        auto robot_end = end;
-        std::string robot = eat_robot(it, robot_end);
-        if (robot != kRobotNames[i]) die("wrong robot");
-        while (it != robot_end) {
-            auto [target, cost] = eat_cost(it, robot_end);
-            bp.costs[i][static_cast<int>(lookup(target))] = cost;
+        static const std::regex costs_pat(R"((\d+) (\w+))");
+        std::sregex_iterator it2(m[2].first, m[2].second, costs_pat), end2;
+        for (; it2 != end2; it2++) {
+            bp.costs[i][lookup((*it2)[2].str())] = int_match(*it2, 1);
         }
-        it = robot_end;
     }
     return is;
 }
