@@ -24,15 +24,13 @@ struct blueprint {
 };
 
 std::ostream& operator<<(std::ostream& os, const blueprint& bp) {
-    os << "[ id=" << bp.id << " |";
+    os << "[" << bp.id << " | ";
     for (int i = 0; i < 4; i++) {
-        os << ' ' << kRobots[i] << "=(";
-        for (int j = 0; j < 4; j++) {
-            os << " " << kRobots[j] << ":" << bp.costs[i][j] << " ";
-        }
-        os << ") ";
+        std::cout << "( ";
+        for (int j = 0; j < 4; j++) os << bp.costs[i][j] << ' ';
+        std::cout << ") ";
     }
-    return os << " ]";
+    return os << "]";
 }
 
 std::istream& operator>>(std::istream& is, blueprint& bp) {
