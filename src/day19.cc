@@ -1,26 +1,39 @@
+#include <algorithm>
 #include <array>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <map>
+#include <optional>
 #include <regex>
+#include <sstream>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 #include "util.h"
 
-enum class robot : int { ore = 0, clay = 1, obsidian = 2, geode = 3 };
+enum mineral { ore = 0, clay = 1, obsidian = 2, geode = 3 };
 // TODO: are constexpr maps supported?
 constexpr std::string_view kRobots[] = {"ore", "clay", "obsidian", "geode"};
 int lookup(const std::string_view name) {
     return std::find(kRobots, kRobots + 4, name) - kRobots;
 }
 
-using cost = std::array<int, 4>;
+using counts = std::array<int, 4>;
+counts zero() { return {0, 0, 0, 0}; }
+
+void print(std::ostream& os, counts amts) {
+    os << '[';
+    for (int i = 0; i < 4; i++) os << ' ' << amts[i] << ' ';
+    os << ']';
+}
+
 struct blueprint {
     int id;
-    std::array<cost, 4> costs;
+    std::array<counts, 4> costs;
 };
 
 std::ostream& operator<<(std::ostream& os, const blueprint& bp) {
@@ -62,10 +75,104 @@ std::istream& operator>>(std::istream& is, blueprint& bp) {
     return is;
 }
 
+bool positive(const counts& x) {
+    return std::all_of(x.begin(), x.end(), [](int x) { return x >= 0; });
+}
+
+int forecast(const counts& have, const counts& robots, int steps_left, int i) {
+    return have[i] + robots[i] * steps_left;
+}
+
+counts forecast(counts have, const counts& robots, int steps_left) {
+    for (int i = 0; i < 4; i++) have[i] += steps_left * robots[i];
+    return have;
+}
+
+counts remove(counts from, const counts& amts) {
+    for (int i = 0; i < 4; i++) from[i] -= amts[i];
+    return from;
+}
+
+counts collect(counts have, const counts& robots) {
+    for (int i = 0; i < 4; i++) have[i] += robots[i];
+    return have;
+}
+
+bool can_afford(const counts& cost, const counts& balance) {
+    for (int i = 0; i < 4; i++)
+        if (cost[i] > 0 && balance[i] < cost[i]) return false;
+    return true;
+}
+
+counts add_robot(counts robots, int i) {
+    robots[i]++;
+    return robots;
+}
+
+using key = std::tuple<int, int, int, int, int, int, int, int, int>;
+key k(const counts& balance, const counts& robots, int steps) {
+    return {balance[0], balance[1], balance[2], balance[3], robots[0],
+            robots[1],  robots[2],  robots[3],  steps};
+}
+
+bool reachable(const blueprint& bp, counts balance, counts robots,
+               int steps_left, std::map<key, bool>& memo) {
+    /*
+std::cout << steps_left << " ";
+print(std::cout, balance);
+print(std::cout, robots);
+std::cout << std::endl;
+*/
+
+    // case 0: out of time
+    // case 1: already have enough
+    if (bool done = positive(balance); done || steps_left <= 0) return done;
+    // case 2: will have enough with current robots
+    if (positive(forecast(balance, robots, steps_left))) return true;
+    auto key = k(balance, robots, steps_left);
+    if (auto it = memo.find(key); it != memo.end()) return it->second;
+
+    // naive backtracking. optimize into these:
+    // case 3: not enough for a mineral but can buy one and recurse
+    // case 4: not enough for a mineral but can buy prerequisites
+    for (int i = 0; i < 4; i++) {
+        if (!can_afford(bp.costs[i], balance)) continue;
+        /*
+        std::cout << "buying: " << kRobots[i] << " ";
+        print(std::cout, bp.costs[i]);
+        std::cout << std::endl;
+        */
+        if (reachable(bp, collect(remove(balance, bp.costs[i]), robots),
+                      add_robot(robots, i), steps_left - 1, memo)) {
+            memo.emplace(key, true);
+            return true;
+        }
+    }
+
+    bool ok =
+        reachable(bp, collect(balance, robots), robots, steps_left - 1, memo);
+    memo.emplace(key, ok);
+    return ok;
+}
+
+int max_geodes(const blueprint& bp, int max_steps) {
+    std::map<key, bool> memo;
+    int geodes = 0;
+    for (;; geodes++) {
+        int target = -1 - geodes;
+        if (!reachable(bp, {0, 0, 0, target}, {1, 0, 0, 0}, max_steps, memo)) {
+            return geodes;
+        }
+    }
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day19 <file>");
     std::ifstream ifs(argv[1]);
     std::istream_iterator<blueprint> begin(ifs), end;
     std::vector<blueprint> blueprints(begin, end);
-    for (const auto& bp : blueprints) std::cout << bp << std::endl;
+    for (const auto& bp : blueprints) {
+        auto max = max_geodes(bp, 24);
+        std::cout << "max " << bp.id << ": " << max << std::endl;
+    }
 }
