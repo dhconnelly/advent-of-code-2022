@@ -161,4 +161,17 @@ int main(int argc, char* argv[]) {
         sum += blueprints[i].id * max[i];
     }
     std::cout << sum << std::endl;
+
+    // do it again
+    std::vector<int64_t> max2(3);
+    std::vector<std::thread> threads2;
+    for (int i = 0; i < 3; i++) {
+        threads2.emplace_back(max_geodes, blueprints[i], 32, std::ref(max2[i]));
+    }
+    int64_t prod = 1;
+    for (int i = 0; i < 3; i++) {
+        threads2[i].join();
+        prod *= max2[i];
+    }
+    std::cout << prod << std::endl;
 }
