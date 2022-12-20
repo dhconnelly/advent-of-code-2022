@@ -104,7 +104,7 @@ bool can_afford(const counts& cost, const counts& balance) {
     return true;
 }
 
-counts add_robot(counts robots, int i) {
+counts incr(counts robots, int i) {
     robots[i]++;
     return robots;
 }
@@ -117,52 +117,28 @@ key k(const counts& balance, const counts& robots, int steps) {
 
 bool reachable(const blueprint& bp, counts balance, counts robots,
                int steps_left, std::map<key, bool>& memo) {
-    /*
-std::cout << steps_left << " ";
-print(std::cout, balance);
-print(std::cout, robots);
-std::cout << std::endl;
-*/
-
-    // case 0: out of time
-    // case 1: already have enough
-    if (bool done = positive(balance); done || steps_left <= 0) return done;
-    // case 2: will have enough with current robots
+    if (steps_left <= 0) return positive(balance);
     if (positive(forecast(balance, robots, steps_left))) return true;
     auto key = k(balance, robots, steps_left);
     if (auto it = memo.find(key); it != memo.end()) return it->second;
-
-    // naive backtracking. optimize into these:
-    // case 3: not enough for a mineral but can buy one and recurse
-    // case 4: not enough for a mineral but can buy prerequisites
     for (int i = 0; i < 4; i++) {
-        if (!can_afford(bp.costs[i], balance)) continue;
-        /*
-        std::cout << "buying: " << kRobots[i] << " ";
-        print(std::cout, bp.costs[i]);
-        std::cout << std::endl;
-        */
-        if (reachable(bp, collect(remove(balance, bp.costs[i]), robots),
-                      add_robot(robots, i), steps_left - 1, memo)) {
-            memo.emplace(key, true);
-            return true;
+        if (can_afford(bp.costs[i], balance) &&
+            reachable(bp, collect(remove(balance, bp.costs[i]), robots),
+                      incr(robots, i), steps_left - 1, memo)) {
+            return memo[key] = true;
         }
     }
-
-    bool ok =
-        reachable(bp, collect(balance, robots), robots, steps_left - 1, memo);
-    memo.emplace(key, ok);
-    return ok;
+    return memo[key] = reachable(bp, collect(balance, robots), robots,
+                                 steps_left - 1, memo);
 }
 
 int max_geodes(const blueprint& bp, int max_steps) {
     std::map<key, bool> memo;
-    int geodes = 0;
-    for (;; geodes++) {
-        int target = -1 - geodes;
-        if (!reachable(bp, {0, 0, 0, target}, {1, 0, 0, 0}, max_steps, memo)) {
-            return geodes;
+    for (int n = 1;; n++) {
+        if (!reachable(bp, {0, 0, 0, -n}, {1, 0, 0, 0}, max_steps, memo)) {
+            return n - 1;
         }
+        std::cout << n << std::endl;
     }
 }
 
