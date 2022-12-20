@@ -121,7 +121,7 @@ bool reachable(const blueprint& bp, counts balance, counts robots,
     if (positive(forecast(balance, robots, steps_left))) return true;
     auto key = k(balance, robots, steps_left);
     if (auto it = memo.find(key); it != memo.end()) return it->second;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 3; i >= 0; i--) {
         if (can_afford(bp.costs[i], balance) &&
             reachable(bp, collect(remove(balance, bp.costs[i]), robots),
                       incr(robots, i), steps_left - 1, memo)) {
@@ -138,7 +138,6 @@ int max_geodes(const blueprint& bp, int max_steps) {
         if (!reachable(bp, {0, 0, 0, -n}, {1, 0, 0, 0}, max_steps, memo)) {
             return n - 1;
         }
-        std::cout << n << std::endl;
     }
 }
 
@@ -147,8 +146,12 @@ int main(int argc, char* argv[]) {
     std::ifstream ifs(argv[1]);
     std::istream_iterator<blueprint> begin(ifs), end;
     std::vector<blueprint> blueprints(begin, end);
+
+    int64_t sum = 0;
     for (const auto& bp : blueprints) {
-        auto max = max_geodes(bp, 24);
-        std::cout << "max " << bp.id << ": " << max << std::endl;
+        int64_t quality = bp.id * max_geodes(bp, 24);
+        std::cout << quality << std::endl;
+        sum += quality;
     }
+    std::cout << sum << std::endl;
 }
