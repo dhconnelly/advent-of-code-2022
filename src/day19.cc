@@ -9,6 +9,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -132,11 +133,12 @@ bool reachable(const blueprint& bp, counts balance, counts robots,
                                  steps_left - 1, memo);
 }
 
-int max_geodes(const blueprint& bp, int max_steps) {
+void max_geodes(const blueprint& bp, int max_steps, int64_t& result) {
     std::map<key, bool> memo;
     for (int n = 1;; n++) {
         if (!reachable(bp, {0, 0, 0, -n}, {1, 0, 0, 0}, max_steps, memo)) {
-            return n - 1;
+            result = n - 1;
+            return;
         }
     }
 }
@@ -147,11 +149,16 @@ int main(int argc, char* argv[]) {
     std::istream_iterator<blueprint> begin(ifs), end;
     std::vector<blueprint> blueprints(begin, end);
 
+    // compute the quality scores in parallel
+    std::vector<int64_t> max(blueprints.size());
+    std::vector<std::thread> threads;
+    for (int i = 0; i < blueprints.size(); i++) {
+        threads.emplace_back(max_geodes, blueprints[i], 24, std::ref(max[i]));
+    }
     int64_t sum = 0;
-    for (const auto& bp : blueprints) {
-        int64_t quality = bp.id * max_geodes(bp, 24);
-        std::cout << quality << std::endl;
-        sum += quality;
+    for (int i = 0; i < blueprints.size(); i++) {
+        threads[i].join();
+        sum += blueprints[i].id * max[i];
     }
     std::cout << sum << std::endl;
 }
