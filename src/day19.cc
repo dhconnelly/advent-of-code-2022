@@ -3,7 +3,6 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
-#include <map>
 #include <numeric>
 #include <optional>
 #include <regex>
@@ -12,12 +11,14 @@
 #include <string_view>
 #include <thread>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "util.h"
 
 enum mineral { ore = 0, clay = 1, obsidian = 2, geode = 3 };
+
 // TODO: are constexpr maps supported?
 constexpr std::string_view kRobots[] = {"ore", "clay", "obsidian", "geode"};
 int lookup(const std::string_view name) {
@@ -26,12 +27,6 @@ int lookup(const std::string_view name) {
 
 using counts = std::array<int, 4>;
 counts zero() { return {0, 0, 0, 0}; }
-
-void print(std::ostream& os, counts amts) {
-    os << '[';
-    for (int i = 0; i < 4; i++) os << ' ' << amts[i] << ' ';
-    os << ']';
-}
 
 struct blueprint {
     int id;
@@ -108,18 +103,24 @@ inline bool positive_forecast(const counts& balance, const counts& robots,
     return true;
 }
 
-using key =
-    std::tuple<int8_t, int8_t, int8_t, int8_t, int8_t, int8_t, int8_t, int8_t>;
-key k(const counts& balance, const counts& robots, int steps) {
-    return {balance[0], balance[1], balance[2], balance[3],
-            robots[0],  robots[1],  robots[2],  robots[3]};
+inline uint64_t k(const counts& balance, const counts& robots, int steps) {
+    uint64_t x = static_cast<uint8_t>(balance[0]);
+    x = (x << 8) | static_cast<uint8_t>(balance[1]);
+    x = (x << 8) | static_cast<uint8_t>(balance[2]);
+    x = (x << 8) | static_cast<uint8_t>(balance[3]);
+    x = (x << 8) | static_cast<uint8_t>(robots[0]);
+    x = (x << 8) | static_cast<uint8_t>(robots[1]);
+    x = (x << 8) | static_cast<uint8_t>(robots[2]);
+    x = (x << 8) | static_cast<uint8_t>(robots[3]);
+    return x;
 }
 
 bool build(const blueprint& bp, const counts& max_robots, counts& balance,
-           counts& robots, int steps_left, std::map<key, bool>& memo) {
+           counts& robots, int steps_left,
+           std::unordered_map<uint64_t, bool>& memo) {
     if (steps_left <= 0) return positive(balance);
     if (positive_forecast(balance, robots, steps_left)) return true;
-    auto key = k(balance, robots, steps_left);
+    uint64_t key = k(balance, robots, steps_left);
     if (auto it = memo.find(key); it != memo.end()) return it->second;
 
     // which bot to build next?
@@ -158,7 +159,7 @@ counts max_robots(const blueprint& bp) {
 }
 
 void max_geodes(const blueprint& bp, int max_steps, int& result) {
-    std::map<key, bool> memo;
+    std::unordered_map<uint64_t, bool> memo;
     for (int n = 1;; n++) {
         counts robots = {1, 0, 0, 0};
         counts want = {0, 0, 0, -n};
