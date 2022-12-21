@@ -4,6 +4,7 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <numeric>
 #include <optional>
 #include <regex>
 #include <sstream>
@@ -110,14 +111,31 @@ counts incr(counts robots, int i) {
     return robots;
 }
 
+static constexpr int kMax = std::numeric_limits<int>::max();
+
+int64_t until_affordable(const counts& balance, const counts& robots,
+                         const counts& cost) {
+    int64_t max_duration = 0;
+    for (int i = 0; i < 4; i++) {
+        if (cost[i] == 0) continue;
+        int64_t deficit = cost[i] - balance[i];
+        if (deficit <= 0) continue;
+        if (deficit > 0 && robots[i] == 0) return kMax;
+        int64_t duration = deficit / robots[i];
+        if (deficit % robots[i] != 0) ++duration;
+        max_duration = std::max(max_duration, duration);
+    }
+    return max_duration;
+}
+
 using key = std::tuple<int, int, int, int, int, int, int, int, int>;
 key k(const counts& balance, const counts& robots, int steps) {
     return {balance[0], balance[1], balance[2], balance[3], robots[0],
             robots[1],  robots[2],  robots[3],  steps};
 }
 
-bool reachable(const blueprint& bp, counts balance, counts robots,
-               int steps_left, std::map<key, bool>& memo) {
+bool reachable(const blueprint& bp, const counts& max_robots, counts balance,
+               counts robots, int steps_left, std::map<key, bool>& memo) {
     // std::cout << bp.id << " ";
     // print(std::cout, balance);
     // print(std::cout, robots);
@@ -130,28 +148,36 @@ bool reachable(const blueprint& bp, counts balance, counts robots,
     // which bot to build next?
     // (full disclosure: needed a hint here to frame it this way)
     for (int i = 3; i >= 0; i--) {
-        for (int duration = 0; duration < steps_left; duration++) {
-            counts future_balance = forecast(balance, robots, duration);
-            bool affordable = can_afford(bp.costs[i], future_balance);
-            if (affordable) {
-                if (reachable(
-                        bp,
-                        collect(remove(future_balance, bp.costs[i]), robots),
-                        incr(robots, i), steps_left - duration - 1, memo)) {
-                    return memo[key] = true;
-                }
-                break;
-            }
+        if (robots[i] >= max_robots[i]) continue;
+        int64_t duration = until_affordable(balance, robots, bp.costs[i]);
+        if (duration >= steps_left) continue;
+        counts future_balance = forecast(balance, robots, duration);
+        if (reachable(bp, max_robots,
+                      collect(remove(future_balance, bp.costs[i]), robots),
+                      incr(robots, i), steps_left - duration - 1, memo)) {
+            return memo[key] = true;
         }
     }
 
     return memo[key] = false;
 }
 
+counts max_robots(const blueprint& bp) {
+    counts max_robots = {0, 0, 0, kMax};
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            max_robots[j] = std::max(max_robots[j], bp.costs[i][j]);
+        }
+    }
+    return max_robots;
+}
+
 int64_t max_geodes(const blueprint& bp, int max_steps) {
     std::map<key, bool> memo;
+    counts have = {1, 0, 0, 0};
     for (int n = 1;; n++) {
-        if (!reachable(bp, {0, 0, 0, -n}, {1, 0, 0, 0}, max_steps, memo)) {
+        counts want = {0, 0, 0, -n};
+        if (!reachable(bp, max_robots(bp), want, have, max_steps, memo)) {
             return n - 1;
         }
         std::cout << bp.id << ": " << n << std::endl;
@@ -164,10 +190,15 @@ int main(int argc, char* argv[]) {
     std::istream_iterator<blueprint> begin(ifs), end;
     std::vector<blueprint> blueprints(begin, end);
 
-    // compute the quality scores in parallel
     int64_t sum = 0;
     for (int i = 0; i < blueprints.size(); i++) {
         sum += blueprints[i].id * max_geodes(blueprints[i], 24);
     }
     std::cout << sum << std::endl;
+
+    int64_t prod = 1;
+    for (int i = 0; i < 3; i++) {
+        prod *= max_geodes(blueprints[i], 32);
+    }
+    std::cout << prod << std::endl;
 }
