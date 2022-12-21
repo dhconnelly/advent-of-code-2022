@@ -1,20 +1,26 @@
 name: C/C++ CI
 
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
+    push:
+        branches: ["main"]
+    pull_request:
+        branches: ["main"]
 
 jobs:
-  ci:
-    runs-on: ubuntu-latest
+    ci:
+        runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v3
-      - name: g++ version
-        run: g++ -v
-      - name: build
-        run: make
-      - name: test
-        run: ./test.sh
+        steps:
+            - uses: actions/checkout@v3
+            - uses: actions/setup-python@v4
+              with:
+                  python-version: "3.10"
+                  cache: "pip" # caching pip dependencies
+            - name: sympy
+              run: pip install sympy
+            - name: g++ version
+              run: g++ -v
+            - name: build
+              run: make
+            - name: test
+              run: ./test.sh

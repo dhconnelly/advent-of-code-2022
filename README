@@ -4,6 +4,7 @@ dependencies:
 
 - g++ with c++20 support
 - make
+- python3 and sympy (pip install sympy)
 
 usage:
 

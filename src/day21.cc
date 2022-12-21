@@ -3,6 +3,7 @@
 #include <map>
 #include <memory>
 #include <regex>
+#include <sstream>
 #include <string>
 #include <utility>
 
@@ -133,5 +134,17 @@ int main(int argc, char* argv[]) {
     rules["humn"].typ = expr_type::var;
     rules["humn"].var = "humn";
     evaluator e2(rules);
-    std::cout << e2.evaluate("root") << std::endl;
+    expr eqn = e2.evaluate("root");
+    if (eqn.typ != expr_type::binary || eqn.op != '=' ||
+        eqn.args.first->typ != expr_type::binary ||
+        eqn.args.second->typ != expr_type::val) {
+        die("bad equation");
+    }
+    std::stringstream s;
+    s << std::endl;
+    s << "python -c \"import sympy" << std::endl;
+    s << "humn = sympy.Symbol('humn')" << std::endl;
+    s << "print(sympy.solve(sympy.Eq(" << *eqn.args.first << ", "
+      << *eqn.args.second << "))[0])\"" << std::endl;
+    system(s.str().c_str());
 }
