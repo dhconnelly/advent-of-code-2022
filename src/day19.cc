@@ -80,71 +80,45 @@ std::istream& operator>>(std::istream& is, blueprint& bp) {
     return is;
 }
 
-bool positive(const counts& x) {
-    return std::all_of(x.begin(), x.end(), [](int x) { return x >= 0; });
+static constexpr int kMax = std::numeric_limits<int>::max();
+
+int64_t when_affordable(const counts& balance, const counts& robots,
+                        const counts& cost) {
+    int64_t max = 0;
+    for (int i = 0; i < 4; i++) {
+        int64_t deficit = cost[i] - balance[i];
+        if (cost[i] == 0 || deficit <= 0) continue;
+        if (deficit > 0 && robots[i] == 0) return kMax;
+        int64_t t = deficit / robots[i];
+        max = std::max(max, deficit % robots[i] == 0 ? t : t + 1);
+    }
+    return max;
 }
 
-int forecast(const counts& have, const counts& robots, int steps_left, int i) {
-    return have[i] + robots[i] * steps_left;
-}
-
-counts forecast(counts have, const counts& robots, int steps_left) {
-    for (int i = 0; i < 4; i++) have[i] += steps_left * robots[i];
-    return have;
-}
-
-counts remove(counts from, const counts& amts) {
-    for (int i = 0; i < 4; i++) from[i] -= amts[i];
-    return from;
-}
-
-counts collect(counts have, const counts& robots) {
-    for (int i = 0; i < 4; i++) have[i] += robots[i];
-    return have;
-}
-
-bool can_afford(const counts& cost, const counts& balance) {
+inline bool positive(const counts& x) {
     for (int i = 0; i < 4; i++)
-        if (cost[i] > 0 && balance[i] < cost[i]) return false;
+        if (x[i] < 0) return false;
     return true;
 }
 
-counts incr(counts robots, int i) {
-    robots[i]++;
-    return robots;
+inline bool positive_forecast(const counts& balance, const counts& robots,
+                              int steps_left) {
+    for (int i = 0; i < 4; i++)
+        if ((balance[i] + steps_left * robots[i]) < 0) return false;
+    return true;
 }
 
-static constexpr int kMax = std::numeric_limits<int>::max();
-
-int64_t until_affordable(const counts& balance, const counts& robots,
-                         const counts& cost) {
-    int64_t max_duration = 0;
-    for (int i = 0; i < 4; i++) {
-        if (cost[i] == 0) continue;
-        int64_t deficit = cost[i] - balance[i];
-        if (deficit <= 0) continue;
-        if (deficit > 0 && robots[i] == 0) return kMax;
-        int64_t duration = deficit / robots[i];
-        if (deficit % robots[i] != 0) ++duration;
-        max_duration = std::max(max_duration, duration);
-    }
-    return max_duration;
-}
-
-using key = std::tuple<int, int, int, int, int, int, int, int, int>;
+using key =
+    std::tuple<int8_t, int8_t, int8_t, int8_t, int8_t, int8_t, int8_t, int8_t>;
 key k(const counts& balance, const counts& robots, int steps) {
-    return {balance[0], balance[1], balance[2], balance[3], robots[0],
-            robots[1],  robots[2],  robots[3],  steps};
+    return {balance[0], balance[1], balance[2], balance[3],
+            robots[0],  robots[1],  robots[2],  robots[3]};
 }
 
-bool reachable(const blueprint& bp, const counts& max_robots, counts balance,
-               counts robots, int steps_left, std::map<key, bool>& memo) {
-    // std::cout << bp.id << " ";
-    // print(std::cout, balance);
-    // print(std::cout, robots);
-    // std::cout << std::endl;
+bool build(const blueprint& bp, const counts& max_robots, counts& balance,
+           counts& robots, int steps_left, std::map<key, bool>& memo) {
     if (steps_left <= 0) return positive(balance);
-    if (positive(forecast(balance, robots, steps_left))) return true;
+    if (positive_forecast(balance, robots, steps_left)) return true;
     auto key = k(balance, robots, steps_left);
     if (auto it = memo.find(key); it != memo.end()) return it->second;
 
@@ -152,13 +126,20 @@ bool reachable(const blueprint& bp, const counts& max_robots, counts balance,
     // full disclosure: needed a hint here to frame it this way
     for (int i = 3; i >= 0; i--) {
         if (robots[i] >= max_robots[i]) continue;
-        int64_t duration = until_affordable(balance, robots, bp.costs[i]);
-        if (duration >= steps_left) continue;
-        counts future_balance = forecast(balance, robots, duration);
-        if (reachable(bp, max_robots,
-                      collect(remove(future_balance, bp.costs[i]), robots),
-                      incr(robots, i), steps_left - duration - 1, memo)) {
+        int64_t t = when_affordable(balance, robots, bp.costs[i]);
+        if (t >= steps_left) continue;
+
+        // buy and backtrack if unsuccessful
+        for (int j = 0; j < 4; j++) {
+            balance[j] += robots[j] * (t + 1) - bp.costs[i][j];
+        }
+        robots[i]++;
+        if (build(bp, max_robots, balance, robots, steps_left - t - 1, memo)) {
             return memo[key] = true;
+        }
+        robots[i]--;
+        for (int j = 0; j < 4; j++) {
+            balance[j] -= robots[j] * (t + 1) - bp.costs[i][j];
         }
     }
 
@@ -178,10 +159,10 @@ counts max_robots(const blueprint& bp) {
 
 void max_geodes(const blueprint& bp, int max_steps, int& result) {
     std::map<key, bool> memo;
-    counts have = {1, 0, 0, 0};
     for (int n = 1;; n++) {
+        counts robots = {1, 0, 0, 0};
         counts want = {0, 0, 0, -n};
-        if (!reachable(bp, max_robots(bp), want, have, max_steps, memo)) {
+        if (!build(bp, max_robots(bp), want, robots, max_steps, memo)) {
             result = n - 1;
             return;
         }
@@ -194,6 +175,7 @@ int main(int argc, char* argv[]) {
     std::istream_iterator<blueprint> begin(ifs), end;
     const std::vector<blueprint> blueprints(begin, end);
 
+    // part 1
     int64_t sum = 0;
     for (int i = 0; i < blueprints.size(); i++) {
         int result;
@@ -202,6 +184,7 @@ int main(int argc, char* argv[]) {
     }
     std::cout << sum << std::endl;
 
+    // part 2 in threads
     int t = std::max(3LU, blueprints.size());
     std::vector<std::thread> threads;
     std::vector<int> results(t);
