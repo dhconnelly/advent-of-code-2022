@@ -17,7 +17,7 @@ jobs:
                   python-version: "3.10"
                   cache: "pip" # caching pip dependencies
             - name: sympy
-              run: pip install sympy
+              run: pip install -r requirements.txt
             - name: g++ version
               run: g++ -v
             - name: build
