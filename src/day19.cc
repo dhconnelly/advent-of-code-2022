@@ -118,28 +118,43 @@ key k(const counts& balance, const counts& robots, int steps) {
 
 bool reachable(const blueprint& bp, counts balance, counts robots,
                int steps_left, std::map<key, bool>& memo) {
+    // std::cout << bp.id << " ";
+    // print(std::cout, balance);
+    // print(std::cout, robots);
+    // std::cout << std::endl;
     if (steps_left <= 0) return positive(balance);
     if (positive(forecast(balance, robots, steps_left))) return true;
     auto key = k(balance, robots, steps_left);
     if (auto it = memo.find(key); it != memo.end()) return it->second;
+
+    // which bot to build next?
+    // (full disclosure: needed a hint here to frame it this way)
     for (int i = 3; i >= 0; i--) {
-        if (can_afford(bp.costs[i], balance) &&
-            reachable(bp, collect(remove(balance, bp.costs[i]), robots),
-                      incr(robots, i), steps_left - 1, memo)) {
-            return memo[key] = true;
+        for (int duration = 0; duration < steps_left; duration++) {
+            counts future_balance = forecast(balance, robots, duration);
+            bool affordable = can_afford(bp.costs[i], future_balance);
+            if (affordable) {
+                if (reachable(
+                        bp,
+                        collect(remove(future_balance, bp.costs[i]), robots),
+                        incr(robots, i), steps_left - duration - 1, memo)) {
+                    return memo[key] = true;
+                }
+                break;
+            }
         }
     }
-    return memo[key] = reachable(bp, collect(balance, robots), robots,
-                                 steps_left - 1, memo);
+
+    return memo[key] = false;
 }
 
-void max_geodes(const blueprint& bp, int max_steps, int64_t& result) {
+int64_t max_geodes(const blueprint& bp, int max_steps) {
     std::map<key, bool> memo;
     for (int n = 1;; n++) {
         if (!reachable(bp, {0, 0, 0, -n}, {1, 0, 0, 0}, max_steps, memo)) {
-            result = n - 1;
-            return;
+            return n - 1;
         }
+        std::cout << bp.id << ": " << n << std::endl;
     }
 }
 
@@ -150,28 +165,9 @@ int main(int argc, char* argv[]) {
     std::vector<blueprint> blueprints(begin, end);
 
     // compute the quality scores in parallel
-    std::vector<int64_t> max(blueprints.size());
-    std::vector<std::thread> threads;
-    for (int i = 0; i < blueprints.size(); i++) {
-        threads.emplace_back(max_geodes, blueprints[i], 24, std::ref(max[i]));
-    }
     int64_t sum = 0;
     for (int i = 0; i < blueprints.size(); i++) {
-        threads[i].join();
-        sum += blueprints[i].id * max[i];
+        sum += blueprints[i].id * max_geodes(blueprints[i], 24);
     }
     std::cout << sum << std::endl;
-
-    // do it again
-    std::vector<int64_t> max2(3);
-    std::vector<std::thread> threads2;
-    for (int i = 0; i < 3; i++) {
-        threads2.emplace_back(max_geodes, blueprints[i], 32, std::ref(max2[i]));
-    }
-    int64_t prod = 1;
-    for (int i = 0; i < 3; i++) {
-        threads2[i].join();
-        prod *= max2[i];
-    }
-    std::cout << prod << std::endl;
 }
