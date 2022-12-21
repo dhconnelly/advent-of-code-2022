@@ -105,13 +105,14 @@ inline bool positive_forecast(const counts& balance, const counts& robots,
 
 inline uint64_t k(const counts& balance, const counts& robots, int steps) {
     uint64_t x = static_cast<uint8_t>(balance[0]);
-    x = (x << 8) | static_cast<uint8_t>(balance[1]);
-    x = (x << 8) | static_cast<uint8_t>(balance[2]);
-    x = (x << 8) | static_cast<uint8_t>(balance[3]);
-    x = (x << 8) | static_cast<uint8_t>(robots[0]);
-    x = (x << 8) | static_cast<uint8_t>(robots[1]);
-    x = (x << 8) | static_cast<uint8_t>(robots[2]);
-    x = (x << 8) | static_cast<uint8_t>(robots[3]);
+    x = (x << 7) | static_cast<uint8_t>(balance[1]);
+    x = (x << 7) | static_cast<uint8_t>(balance[2]);
+    x = (x << 7) | static_cast<uint8_t>(balance[3]);
+    x = (x << 7) | static_cast<uint8_t>(robots[0]);
+    x = (x << 7) | static_cast<uint8_t>(robots[1]);
+    x = (x << 7) | static_cast<uint8_t>(robots[2]);
+    x = (x << 7) | static_cast<uint8_t>(robots[3]);
+    x = (x << 6) | static_cast<uint8_t>(steps);
     return x;
 }
 
@@ -186,7 +187,7 @@ int main(int argc, char* argv[]) {
     std::cout << sum << std::endl;
 
     // part 2 in threads
-    int t = std::max(3LU, blueprints.size());
+    int t = std::min(3LU, blueprints.size());
     std::vector<std::thread> threads;
     std::vector<int> results(t);
     for (int i = 0; i < t; i++) {
@@ -196,7 +197,6 @@ int main(int argc, char* argv[]) {
     int64_t prod = 1;
     for (int i = 0; i < t; i++) {
         threads[i].join();
-        std::cout << i << " -> " << results[i] << std::endl;
         prod *= results[i];
     }
     std::cout << prod << std::endl;
