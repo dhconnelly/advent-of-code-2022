@@ -50,7 +50,10 @@ std::ostream& operator<<(std::ostream& os, const blueprint& bp) {
 
 std::istream& operator>>(std::istream& is, blueprint& bp) {
     std::string line;
-    if (!std::getline(is, line)) return is;
+    if (!std::getline(is, line)) {
+        is.setstate(std::istream::failbit);
+        return is;
+    }
     std::smatch m;
 
     // id
@@ -146,7 +149,7 @@ bool reachable(const blueprint& bp, const counts& max_robots, counts balance,
     if (auto it = memo.find(key); it != memo.end()) return it->second;
 
     // which bot to build next?
-    // (full disclosure: needed a hint here to frame it this way)
+    // full disclosure: needed a hint here to frame it this way
     for (int i = 3; i >= 0; i--) {
         if (robots[i] >= max_robots[i]) continue;
         int64_t duration = until_affordable(balance, robots, bp.costs[i]);
@@ -162,6 +165,7 @@ bool reachable(const blueprint& bp, const counts& max_robots, counts balance,
     return memo[key] = false;
 }
 
+// this was another hint
 counts max_robots(const blueprint& bp) {
     counts max_robots = {0, 0, 0, kMax};
     for (int i = 0; i < 4; i++) {
@@ -172,15 +176,15 @@ counts max_robots(const blueprint& bp) {
     return max_robots;
 }
 
-int64_t max_geodes(const blueprint& bp, int max_steps) {
+void max_geodes(const blueprint& bp, int max_steps, int& result) {
     std::map<key, bool> memo;
     counts have = {1, 0, 0, 0};
     for (int n = 1;; n++) {
         counts want = {0, 0, 0, -n};
         if (!reachable(bp, max_robots(bp), want, have, max_steps, memo)) {
-            return n - 1;
+            result = n - 1;
+            return;
         }
-        std::cout << bp.id << ": " << n << std::endl;
     }
 }
 
@@ -188,17 +192,28 @@ int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day19 <file>");
     std::ifstream ifs(argv[1]);
     std::istream_iterator<blueprint> begin(ifs), end;
-    std::vector<blueprint> blueprints(begin, end);
+    const std::vector<blueprint> blueprints(begin, end);
 
     int64_t sum = 0;
     for (int i = 0; i < blueprints.size(); i++) {
-        sum += blueprints[i].id * max_geodes(blueprints[i], 24);
+        int result;
+        max_geodes(blueprints[i], 24, result);
+        sum += blueprints[i].id * result;
     }
     std::cout << sum << std::endl;
 
+    int t = std::max(3LU, blueprints.size());
+    std::vector<std::thread> threads;
+    std::vector<int> results(t);
+    for (int i = 0; i < t; i++) {
+        threads.emplace_back(max_geodes, blueprints[i], 32,
+                             std::ref(results[i]));
+    }
     int64_t prod = 1;
-    for (int i = 0; i < 3; i++) {
-        prod *= max_geodes(blueprints[i], 32);
+    for (int i = 0; i < t; i++) {
+        threads[i].join();
+        std::cout << i << " -> " << results[i] << std::endl;
+        prod *= results[i];
     }
     std::cout << prod << std::endl;
 }
