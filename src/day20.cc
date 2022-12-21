@@ -10,24 +10,19 @@ using file = std::list<int64_t>;
 using file_it = file::const_iterator;
 
 file_it shift(const file& f, file_it it, int64_t n) {
+    int64_t k = std::abs(n) % static_cast<int64_t>(f.size());
     if (n < 0) {
-        int64_t k = (-n) % static_cast<int64_t>(f.size());
-        if (k != 0) {
-            for (int64_t i = 0; i < k; i++) {
-                if (it == f.begin()) it = f.end();
-                --it;
-            }
+        for (int64_t i = 0; i < k; i++) {
             if (it == f.begin()) it = f.end();
+            --it;
         }
+        if (it == f.begin()) it = f.end();
     } else if (n > 0) {
-        int64_t k = n % static_cast<int64_t>(f.size());
-        if (k != 0) {
-            for (int64_t i = 0; i < k; i++) {
-                if (it == f.end()) it = f.begin();
-                ++it;
-            }
+        for (int64_t i = 0; i < k; i++) {
             if (it == f.end()) it = f.begin();
+            ++it;
         }
+        if (it == f.end()) it = f.begin();
     }
     return it;
 }
