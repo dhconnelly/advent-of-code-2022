@@ -40,6 +40,7 @@ std::ostream& operator<<(std::ostream& os, const step& s) {
 using grid = std::vector<std::string>;
 using path = std::vector<step>;
 using pt = std::pair<int, int>;
+static constexpr pt oblivion{-1, -1};
 using adjlist = std::vector<pt>;
 using adjmat = std::vector<std::vector<adjlist>>;
 
@@ -52,9 +53,11 @@ pt wrap(const grid& g, pt p) {
     return {row, col};
 }
 
+enum class facing : int { right = 0, down = 1, left = 2, up = 3 };
+static constexpr pt kDirs[] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
+
 adjlist find_nbrs(const grid& g, int row, int col) {
     adjlist nbrs;
-    static constexpr pt kDirs[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
     for (int i = 0; i < 4; i++) {
         pt nbr = wrap(g, {row + kDirs[i].first, col + kDirs[i].second});
         while (g[nbr.first][nbr.second] == ' ') {
@@ -62,7 +65,7 @@ adjlist find_nbrs(const grid& g, int row, int col) {
             nbr.second += kDirs[i].second;
             nbr = wrap(g, nbr);
         }
-        if (g[nbr.first][nbr.second] == '.') nbrs.push_back(nbr);
+        nbrs.push_back(g[nbr.first][nbr.second] == '.' ? nbr : oblivion);
     }
     return nbrs;
 }
@@ -99,8 +102,8 @@ void print(const adjmat& nbrs) {
 class maze {
 public:
     maze(grid g, adjmat nbrs) : g_(g), nbrs_(nbrs) {}
-    char at(pt p) { return g_[p.first][p.second]; }
-    const adjlist& nbrs(pt p) { return nbrs_[p.first][p.second]; }
+    char at(pt p) const { return g_[p.first][p.second]; }
+    const adjlist& nbrs(pt p) const { return nbrs_[p.first][p.second]; }
 
 private:
     grid g_;
@@ -127,12 +130,49 @@ void print(const grid& g) {
     std::cout << std::endl;
 }
 
+pt find_start(const grid& g) {
+    int col = 0;
+    while (g[0][col] != '.') col++;
+    return {0, col};
+}
+
+using pos = std::pair<pt, facing>;
+
+pos move(const maze& m, pos cur, step s) {
+    if (s.typ == step_type::move) {
+        for (int i = 0; i < s.dist; i++) {
+            pt nbr = m.nbrs(cur.first)[int(cur.second)];
+            if (nbr == oblivion) break;
+            cur.first = nbr;
+        }
+    } else {
+        int dir = int(cur.second) + 4;
+        cur.second = facing((dir + (s.dir == 'R' ? 1 : -1)) % 4);
+    }
+    return cur;
+}
+
+void print(grid g, const pos& cur) {
+    char c;
+    switch (cur.second) {
+        case facing::down: c = 'v'; break;
+        case facing::up: c = '^'; break;
+        case facing::left: c = '<'; break;
+        case facing::right: c = '>'; break;
+    }
+    g[cur.first.first][cur.first.second] = c;
+    print(g);
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day22 <file>");
     auto [g, path] = parse(std::ifstream(argv[1]));
-    print(g);
-    auto nbrs = build_adjmat(g);
-    maze m(g, nbrs);
-    print(nbrs);
-    for (step s : path) std::cout << s << std::endl;
+    maze m(g, build_adjmat(g));
+    pos cur(find_start(g), facing::right);
+    for (step s : path) {
+        cur = move(m, cur, s);
+    }
+    int password = 1000 * (cur.first.first + 1) + 4 * (cur.first.second + 1) +
+                   int(cur.second);
+    std::cout << password << std::endl;
 }
