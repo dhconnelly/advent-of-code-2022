@@ -72,16 +72,49 @@ adjlist find_nbrs(const grid& g, int row, int col) {
     return nbrs;
 }
 
-pt cube_nbr(const grid& g, int row, int col, pt dir, int width) {
-    // easy case: it's right there
-    if (row >= 0 && row < g.size() && col >= 0 && col < g[0].size()) {
-        return {row + dir.first, col + dir.second};
+pt cube_nbr(const grid& g, int row, int col, facing dir, int width) {
+    if (row >= 0 && row < 50 && col == 50 && dir == facing::left) {  // A left
+        return {150 - row, 0};  // E left rev
+    } else if (row == 0 && col >= 50 && col < 100 &&
+               dir == facing::up) {    // A up
+        return {150 + (col - 50), 0};  // F left
+    } else if (row == 0 && col >= 100 && col < 150 &&
+               dir == facing::up) {  // B up
+        return {200, col - 100};
+    } else if (row >= 0 && row < 50 && col == 149 &&
+               dir == facing::right) {  // B right
+        return {150 - row, 99};
+    } else if (row == 49 && col >= 100 && col < 150 &&
+               dir == facing::down) {  // B down
+        return {50 + (col - 100), 99};
+    } else if (col == 99 && row >= 50 && row < 100 &&
+               dir == facing::right) {  // C right
+        return {50, 100 + (row - 50)};
+    } else if (col == 50 && row >= 50 && row < 100 &&
+               dir == facing::left) {  // C left
+        return {100, row - 50};
+    } else if (row == 100 && col < 50 && dir == facing::up) {  // E up
+        return {50 + col, 50};
+    } else if (col == 0 && row >= 100 && row < 150 &&
+               dir == facing::left) {   // E left
+        return {50 - (row - 100), 50};  // A left rev
+    } else if (col == 99 && row >= 100 && row < 150 &&
+               dir == facing::right) {  // D right
+        return {50 - (row - 100), 150};
+    } else if (row == 149 && col >= 50 && col < 100 &&
+               dir == facing::down) {  // D down
+        return {150 + (col - 50), 50};
+    } else if (col == 0 && row >= 150 && row < 200 &&
+               dir == facing::left) {  // F left
+        return {0, 50 + (row - 150)};
+    } else if (row == 199 && col < 50 && dir == facing::down) {  // F down
+        return {0, 100 + col};
+    } else if (col == 49 && row >= 150 && row < 200 &&
+               dir == facing::right) {  // F right
+        return {150, 50 + (row - 150)};
+    } else {
+        return {row + kDirs[int(dir)].first, col + kDirs[int(dir)].second};
     }
-    static constexpr pt left = kDirs[int(facing::left)],
-                        right = kDirs[int(facing::right)],
-                        up = kDirs[int(facing::up)],
-                        down = kDirs[int(facing::down)];
-    return {row, col};
 }
 
 int cube_width(const grid& g) {
@@ -98,7 +131,7 @@ adjlist find_nbrs_cube(const grid& g, int row, int col) {
     adjlist nbrs;
     int width = cube_width(g);
     for (int i = 0; i < 4; i++) {
-        pt nbr = cube_nbr(g, row, col, kDirs[i], width);
+        pt nbr = cube_nbr(g, row, col, facing(i), width);
         nbrs[i] = g[nbr.first][nbr.second] == '.' ? nbr : oblivion;
     }
     return nbrs;
@@ -211,6 +244,5 @@ int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day22 <file>");
     auto [g, p] = parse(std::ifstream(argv[1]));
     std::cout << compute_password(g, p, find_nbrs) << std::endl;
-    std::cout << cube_width(g) << std::endl;
-    // std::cout << compute_password(g, p, find_nbrs_cube) << std::endl;
+    std::cout << compute_password(g, p, find_nbrs_cube) << std::endl;
 }
