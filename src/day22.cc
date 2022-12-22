@@ -1,7 +1,9 @@
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <utility>
 #include <vector>
@@ -41,7 +43,7 @@ using grid = std::vector<std::string>;
 using path = std::vector<step>;
 using pt = std::pair<int, int>;
 static constexpr pt oblivion{-1, -1};
-using adjlist = std::vector<pt>;
+using adjlist = std::array<pt, 4>;
 using adjmat = std::vector<std::vector<adjlist>>;
 
 pt wrap(const grid& g, pt p) {
@@ -65,7 +67,39 @@ adjlist find_nbrs(const grid& g, int row, int col) {
             nbr.second += kDirs[i].second;
             nbr = wrap(g, nbr);
         }
-        nbrs.push_back(g[nbr.first][nbr.second] == '.' ? nbr : oblivion);
+        nbrs[i] = g[nbr.first][nbr.second] == '.' ? nbr : oblivion;
+    }
+    return nbrs;
+}
+
+pt cube_nbr(const grid& g, int row, int col, pt dir, int width) {
+    // easy case: it's right there
+    if (row >= 0 && row < g.size() && col >= 0 && col < g[0].size()) {
+        return {row + dir.first, col + dir.second};
+    }
+    static constexpr pt left = kDirs[int(facing::left)],
+                        right = kDirs[int(facing::right)],
+                        up = kDirs[int(facing::up)],
+                        down = kDirs[int(facing::down)];
+    return {row, col};
+}
+
+int cube_width(const grid& g) {
+    size_t width = std::numeric_limits<int>::max();
+    for (const auto& row : g) {
+        auto begin = row.find_first_not_of(' ');
+        auto end = row.find_last_not_of(' ');
+        width = std::min(width, end - begin + 1);
+    }
+    return width;
+}
+
+adjlist find_nbrs_cube(const grid& g, int row, int col) {
+    adjlist nbrs;
+    int width = cube_width(g);
+    for (int i = 0; i < 4; i++) {
+        pt nbr = cube_nbr(g, row, col, kDirs[i], width);
+        nbrs[i] = g[nbr.first][nbr.second] == '.' ? nbr : oblivion;
     }
     return nbrs;
 }
@@ -177,4 +211,6 @@ int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day22 <file>");
     auto [g, p] = parse(std::ifstream(argv[1]));
     std::cout << compute_password(g, p, find_nbrs) << std::endl;
+    std::cout << cube_width(g) << std::endl;
+    // std::cout << compute_password(g, p, find_nbrs_cube) << std::endl;
 }
