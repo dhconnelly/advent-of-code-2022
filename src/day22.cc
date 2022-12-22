@@ -70,7 +70,8 @@ adjlist find_nbrs(const grid& g, int row, int col) {
     return nbrs;
 }
 
-adjmat build_adjmat(const grid& g) {
+using nbrs_strategy = std::function<adjlist(const grid&, int, int)>;
+adjmat build_adjmat(const grid& g, nbrs_strategy find_nbrs) {
     adjmat nbrs(g.size(), std::vector<adjlist>(g[0].size()));
     for (int row = 0; row < nbrs.size(); row++) {
         for (int col = 0; col < nbrs[0].size(); col++) {
@@ -164,15 +165,16 @@ void print(grid g, const pos& cur) {
     print(g);
 }
 
+int compute_password(const grid& g, const path& p, nbrs_strategy find_nbrs) {
+    maze m(g, build_adjmat(g, find_nbrs));
+    pos cur(find_start(g), facing::right);
+    for (step s : p) cur = move(m, cur, s);
+    return 1000 * (cur.first.first + 1) + 4 * (cur.first.second + 1) +
+           int(cur.second);
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day22 <file>");
-    auto [g, path] = parse(std::ifstream(argv[1]));
-    maze m(g, build_adjmat(g));
-    pos cur(find_start(g), facing::right);
-    for (step s : path) {
-        cur = move(m, cur, s);
-    }
-    int password = 1000 * (cur.first.first + 1) + 4 * (cur.first.second + 1) +
-                   int(cur.second);
-    std::cout << password << std::endl;
+    auto [g, p] = parse(std::ifstream(argv[1]));
+    std::cout << compute_password(g, p, find_nbrs) << std::endl;
 }
