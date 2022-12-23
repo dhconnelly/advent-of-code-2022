@@ -5,6 +5,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <utility>
 
 #include "util.h"
@@ -69,14 +70,17 @@ std::map<pt, std::vector<pt>> propose(const std::set<pt>& elves, int i) {
     return all;
 }
 
-void tick(std::set<pt>& elves, int i) {
+bool tick(std::set<pt>& elves, int i) {
     auto proposals = propose(elves, i);
+    bool moved = false;
     for (auto [dest, candidates] : proposals) {
         if (candidates.size() == 1) {
             elves.erase(candidates[0]);
             elves.insert(dest);
+            moved = true;
         }
     }
+    return moved;
 }
 
 std::set<pt> parse(std::istream&& is) {
@@ -105,6 +109,7 @@ std::pair<pt, pt> bounds(const std::set<pt>& elves) {
 
 void print(const std::set<pt>& elves) {
     auto [min, max] = bounds(elves);
+    std::cout << "======================\n";
     for (int row = min.row - 1; row <= max.row + 1; row++) {
         for (int col = min.col - 1; col <= max.col + 1; col++) {
             if (elves.count({row, col})) std::cout << '#';
@@ -121,7 +126,15 @@ int size(const std::pair<pt, pt>& bounds) {
 
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day23 <file>");
-    auto elves = parse(std::ifstream(argv[1]));
-    for (int i = 0; i < 10; i++) tick(elves, i);
-    std::cout << (size(bounds(elves)) - elves.size()) << std::endl;
+    std::set<pt> elves = parse(std::ifstream(argv[1]));
+
+    std::set<pt> elves1 = elves;
+    for (int i = 0; i < 10; i++) tick(elves1, i);
+    std::cout << (size(bounds(elves1)) - elves1.size()) << std::endl;
+
+    std::set<pt> elves2 = elves;
+    int i = 0;
+    while (tick(elves2, i++))
+        ;
+    std::cout << i << std::endl;
 }
