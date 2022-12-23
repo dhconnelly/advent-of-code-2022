@@ -16,9 +16,6 @@ struct pt {
 bool operator<(pt a, pt b) {
     return std::pair{a.row, a.col} < std::pair{b.row, b.col};
 }
-std::ostream& operator<<(std::ostream& os, pt p) {
-    return os << '[' << p.row << ',' << p.col << ']';
-}
 pt add(pt a, pt b) { return {a.row + b.row, a.col + b.col}; }
 
 bool any_adjacent(const std::set<pt>& elves, pt p) {
@@ -105,18 +102,6 @@ std::pair<pt, pt> bounds(const std::set<pt>& elves) {
         min_col = std::min(min_col, p.col), max_col = std::max(max_col, p.col);
     }
     return {{min_row, min_col}, {max_row, max_col}};
-}
-
-void print(const std::set<pt>& elves) {
-    auto [min, max] = bounds(elves);
-    std::cout << "======================\n";
-    for (int row = min.row - 1; row <= max.row + 1; row++) {
-        for (int col = min.col - 1; col <= max.col + 1; col++) {
-            if (elves.count({row, col})) std::cout << '#';
-            else std::cout << '.';
-        }
-        std::cout << std::endl;
-    }
 }
 
 int size(const std::pair<pt, pt>& bounds) {
