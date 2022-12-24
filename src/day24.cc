@@ -115,11 +115,11 @@ bool in_bounds(const grid& g, pt p) {
            p.second < g[p.first].size();
 }
 
-int shortest_path(std::vector<grid>& grids, pt src, pt dst) {
+int shortest_path(std::vector<grid>& grids, pt src, pt dst, int dist) {
     std::set<std::pair<pt, int>> v;
-    v.emplace(src, 0);
+    v.emplace(src, dist);
     std::deque<std::pair<pt, int>> q;
-    q.emplace_back(src, 0);
+    q.emplace_back(src, dist);
     while (!q.empty()) {
         auto [cur, d] = q.front();
         auto& g = grids[d % grids.size()];
@@ -161,5 +161,8 @@ int main(int argc, char* argv[]) {
     auto g = parse(std::ifstream(argv[1]));
     auto [src, dst] = find_entrance_exit(g);
     auto grids = cycles(g);
-    std::cout << shortest_path(grids, src, dst) << std::endl;
+    int path1 = shortest_path(grids, src, dst, 0);
+    int path2 = shortest_path(grids, dst, src, path1);
+    int path3 = shortest_path(grids, src, dst, path2);
+    std::cout << path3 << std::endl;
 }
