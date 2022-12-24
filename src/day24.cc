@@ -16,6 +16,10 @@ using tile_members = std::vector<tile>;
 using grid = std::vector<std::vector<tile_members>>;
 using pt = std::pair<int, int>;
 
+pt add(pt a, pt b) { return {a.first + b.first, a.second + b.second}; }
+
+tile_members& at(grid& g, pt p) { return g[p.first][p.second]; }
+
 grid parse(std::istream&& is) {
     grid g;
     std::string line;
@@ -27,22 +31,6 @@ grid parse(std::istream&& is) {
         }
     }
     return g;
-}
-
-void print(const grid& g, std::ostream& os = std::cout) {
-    for (int row = 0; row < g.size(); row++) {
-        for (int col = 0; col < g[row].size(); col++) {
-            const auto& at_tile = g[row][col];
-            if (at_tile.size() == 0) os << '.';
-            else if (at_tile.size() == 1) os << at_tile[0];
-            else os << at_tile.size();
-        }
-        os << std::endl;
-    }
-}
-
-void print(pt p, std::ostream& os = std::cout) {
-    os << '[' << p.first << ',' << p.second << ']';
 }
 
 std::pair<pt, pt> find_entrance_exit(const grid& g) {
@@ -57,18 +45,6 @@ std::pair<pt, pt> find_entrance_exit(const grid& g) {
     size_t exit_col = find_empty(g.back()) - g.back().begin();
     return {{0, entrance_col}, {g.size() - 1, exit_col}};
 }
-
-// TODO: only actually need to keep track of the iteration modulo cycle length
-using key = std::string;
-key k(const grid& g) {
-    std::stringstream s;
-    print(g, s);
-    return s.str();
-}
-
-pt add(pt a, pt b) { return {a.first + b.first, a.second + b.second}; }
-
-tile_members& at(grid& g, pt p) { return g[p.first][p.second]; }
 
 enum dir { kDirsUp = 0, kDirsDown = 1, kDirsLeft = 2, kDirsRight = 3 };
 constexpr pt kDirs[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {0, 0}};
@@ -90,10 +66,10 @@ pt wrap(const grid& g, pt p) {
     return p;
 }
 
-void step(grid& g, grid& g_next) {
+void step(grid& g, grid& scratch) {
     for (int row = 0; row < g.size(); row++) {
         for (int col = 0; col < g[row].size(); col++) {
-            auto& cur = at(g_next, {row, col});
+            auto& cur = at(scratch, {row, col});
             if (cur.empty() || (cur.size() == 1 && cur[0] == '#')) continue;
             cur.clear();
         }
@@ -104,10 +80,11 @@ void step(grid& g, grid& g_next) {
             for (auto storm : at(g, p)) {
                 if (storm == '#') break;
                 pt q = wrap(g, add(p, dir_for(storm)));
-                at(g_next, q).push_back(storm);
+                at(scratch, q).push_back(storm);
             }
         }
     }
+    g = scratch;
 }
 
 bool in_bounds(const grid& g, pt p) {
@@ -138,19 +115,34 @@ int shortest_path(std::vector<grid>& grids, pt src, pt dst, int dist) {
     die("no path");
 }
 
+void print(const grid& g, std::ostream& os = std::cout) {
+    for (int row = 0; row < g.size(); row++) {
+        for (int col = 0; col < g[row].size(); col++) {
+            const auto& at_tile = g[row][col];
+            if (at_tile.size() == 0) os << '.';
+            else if (at_tile.size() == 1) os << at_tile[0];
+            else os << at_tile.size();
+        }
+        os << std::endl;
+    }
+}
+
+std::string k(const grid& g) {
+    std::stringstream s;
+    print(g, s);
+    return s.str();
+}
+
 std::vector<grid> cycles(grid g) {
     std::vector<grid> cycles;
     cycles.push_back(g);
-    grid g2 = g;
-    int i = 0;
+    grid scratch = g;
     std::set<std::string> v;
     v.insert(k(g));
-    for (;; i++) {
-        step(g, g2);
-        g = g2;
-        auto key = k(g);
-        if (v.count(key)) break;
-        v.insert(key);
+    for (int i = 0;; i++) {
+        step(g, scratch);
+        if (auto key = k(g); v.count(key)) break;
+        else v.insert(key);
         cycles.push_back(g);
     }
     return cycles;
@@ -164,5 +156,6 @@ int main(int argc, char* argv[]) {
     int path1 = shortest_path(grids, src, dst, 0);
     int path2 = shortest_path(grids, dst, src, path1);
     int path3 = shortest_path(grids, src, dst, path2);
+    std::cout << path1 << std::endl;
     std::cout << path3 << std::endl;
 }
