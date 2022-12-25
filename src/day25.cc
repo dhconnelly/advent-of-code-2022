@@ -46,7 +46,7 @@ std::string add(const std::string& x, const std::string& y) {
     return result_rev;
 }
 
-std::string parse(std::istream&& is) {
+std::string sum(std::istream&& is) {
     std::string sum;
     eatline(is, sum);
     for (std::string line; std::getline(is, line);) sum = add(sum, line);
@@ -55,6 +55,5 @@ std::string parse(std::istream&& is) {
 
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day25 <file>");
-    auto sum = parse(std::ifstream(argv[1]));
-    std::cout << sum << std::endl;
+    std::cout << sum(std::ifstream(argv[1])) << std::endl;
 }
