@@ -13,26 +13,48 @@ int64_t value(char c) {
     }
 }
 
-int64_t parse(const std::string& line) {
-    int64_t sum = 0;
-    int64_t place = 1;
-    static constexpr int64_t base = 5;
-    for (auto it = line.rbegin(); it != line.rend(); ++it) {
-        char c = *it;
-        sum += value(c) * place;
-        place *= base;
+std::pair<int, char> snafu(int val) {
+    switch (val) {
+        case -5: return {-1, '0'};
+        case -4: return {-1, '1'};
+        case -3: return {-1, '2'};
+        case -2: return {0, '='};
+        case -1: return {0, '-'};
+        case 0: return {0, '0'};
+        case 1: return {0, '1'};
+        case 2: return {0, '2'};
+        case 3: return {1, '='};
+        case 4: return {1, '-'};
+        case 5: return {1, '0'};
+        default: die("unreachable");
     }
-    return sum;
 }
 
-int64_t parse(std::istream&& is) {
-    int64_t sum = 0;
-    for (std::string line; std::getline(is, line);) sum += parse(line);
+std::string add(const std::string& x, const std::string& y) {
+    int carry = 0;
+    std::string result_rev;
+    for (int i = 0; carry != 0 || i < x.size() || i < y.size(); i++) {
+        int val = carry;
+        carry = 0;
+        if (i < x.size()) val += value(x[x.size() - 1 - i]);
+        if (i < y.size()) val += value(y[y.size() - 1 - i]);
+        auto [next_carry, cur] = snafu(val);
+        carry = next_carry;
+        result_rev.push_back(cur);
+    }
+    std::reverse(result_rev.begin(), result_rev.end());
+    return result_rev;
+}
+
+std::string parse(std::istream&& is) {
+    std::string sum;
+    eatline(is, sum);
+    for (std::string line; std::getline(is, line);) sum = add(sum, line);
     return sum;
 }
 
 int main(int argc, char* argv[]) {
     if (argc != 2) die("usage: day25 <file>");
-    int64_t sum = parse(std::ifstream(argv[1]));
+    auto sum = parse(std::ifstream(argv[1]));
     std::cout << sum << std::endl;
 }
